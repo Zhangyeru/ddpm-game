@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+gitcode_mcp.log
+*.tsbuildinfo
