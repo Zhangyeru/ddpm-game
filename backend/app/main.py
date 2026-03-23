@@ -108,10 +108,10 @@ def pulse_scan(
         raise HTTPException(status_code=404, detail=str(error)) from error
 
 
-@app.get("/api/session/{session_id}/frames/{frame_index}.svg")
+@app.get("/api/session/{session_id}/frames/{frame_index}")
 def session_frame(session_id: str, frame_index: int, variant: str, token: str) -> Response:
     try:
-        svg = service.render_frame(session_id, frame_index, variant, token)
+        asset = service.render_frame(session_id, frame_index, variant, token)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except PermissionError as error:
@@ -120,7 +120,7 @@ def session_frame(session_id: str, frame_index: int, variant: str, token: str) -
         raise HTTPException(status_code=400, detail=str(error)) from error
 
     return Response(
-        content=svg,
-        media_type="image/svg+xml",
+        content=asset.read_bytes(),
+        media_type=asset.media_type,
         headers={"Cache-Control": "public, max-age=86400, immutable"},
     )

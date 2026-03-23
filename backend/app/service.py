@@ -28,7 +28,7 @@ from .game_data import (
     TargetDefinition,
 )
 from .schemas import CardOption, FreezeRegionOption, SessionSnapshot
-from .trajectory_store import TrajectoryStore
+from .trajectory_store import FrameAsset, TrajectoryStore
 
 
 STEP_INTERVAL_MS = GAME_CONFIG.presentation.step_interval_ms
@@ -45,6 +45,7 @@ class Session:
     session_id: str
     player_id: str
     frame_secret: str
+    sample_id: str
     chapter: int
     level: int
     mission_type: MissionType
@@ -133,11 +134,13 @@ class GameService:
             chapter, level = chapter_and_level_for_round(progress.rounds_started)
             session_id = uuid.uuid4().hex
             total_frames = self.trajectory_store.total_frames
+            sample_id = rng.choice(self.trajectory_store.sample_ids_for_target(target.label))
 
             session = Session(
                 session_id=session_id,
                 player_id=player_key,
                 frame_secret=uuid.uuid4().hex,
+                sample_id=sample_id,
                 chapter=chapter,
                 level=level,
                 mission_type=mission.mission_type,
@@ -330,7 +333,7 @@ class GameService:
         frame_index: int,
         variant_key: str,
         token: str,
-    ) -> str:
+    ) -> FrameAsset:
         with self._lock:
             self._prune_expired_sessions()
             session = self.sessions.get(session_id)
@@ -345,8 +348,9 @@ class GameService:
                 raise PermissionError("帧令牌无效。")
 
             session.last_touched_at = self.clock()
-            return self.trajectory_store.get_frame_svg(
+            return self.trajectory_store.get_frame(
                 target_label=session.target.label,
+                sample_id=session.sample_id,
                 frame_index=frame_index,
                 variant_key=variant_key,
             )
@@ -462,13 +466,12 @@ class GameService:
 
     def _frame_url(self, session: Session, frame_index: int, variant_key: str) -> str:
         token = self._frame_token(session, frame_index, variant_key)
-        return (
-            f"/api/session/{session.session_id}/frames/{frame_index}.svg"
-            f"?variant={variant_key}&token={token}"
-        )
+        return f"/api/session/{session.session_id}/frames/{frame_index}?variant={variant_key}&token={token}"
 
     def _frame_token(self, session: Session, frame_index: int, variant_key: str) -> str:
-        payload = f"{session.session_id}:{frame_index}:{variant_key}".encode("utf-8")
+        payload = f"{session.session_id}:{session.sample_id}:{frame_index}:{variant_key}".encode(
+            "utf-8"
+        )
         secret = session.frame_secret.encode("utf-8")
         return hmac.new(secret, payload, hashlib.sha256).hexdigest()
 

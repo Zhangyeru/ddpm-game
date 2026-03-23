@@ -17,7 +17,13 @@ This repository now contains a playable scaffold for the DDPM web game concept f
 - Supports one freeze-region action
 - Scores a round and reveals the target on win/loss
 
-The backend now reads a local offline trajectory manifest from `backend/assets/trajectories/manifest.json`. That keeps the runtime loop close to a real “precomputed DDPM intermediate frames” setup while remaining lightweight enough for prototype work.
+The backend now reads a local offline trajectory manifest from `backend/assets/trajectories/manifest.json`. The manifest is generated from bundled source photos in `backend/assets/source-images/` and stores precomputed `webp` frame paths for each target, sample, and guidance variant.
+
+If you need to refresh the bundled seed photos from Wikimedia Commons:
+
+```bash
+python3 backend/scripts/download_seed_images.py
+```
 
 If you need to regenerate the offline trajectories:
 
@@ -54,7 +60,7 @@ VITE_API_BASE_URL=http://localhost:8000/api npm run dev
 
 ## Next Recommended Steps
 
-1. Replace generated SVG frames with offline-rendered DDPM trajectories.
+1. Curate or replace the bundled source photos with a more consistent art direction.
 2. Swap polling for WebSocket pushes if you want smoother pacing.
 3. Add a lightweight level config system and persistent progression.
 4. Move from candidate-only guessing to optional typed guesses once the base pacing feels right.

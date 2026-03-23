@@ -1,0 +1,292 @@
+{
+  "cat": [
+    {
+      "sample_id": "sample-01",
+      "title": "Cat November 2010-1a.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Cat_November_2010-1a.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/Cat_November_2010-1a.jpg/960px-Cat_November_2010-1a.jpg",
+      "author": "Alvesgaspar",
+      "license": "CC BY-SA 3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0"
+    },
+    {
+      "sample_id": "sample-02",
+      "title": "Felis catus-cat on snow.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Felis_catus-cat_on_snow.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b6/Felis_catus-cat_on_snow.jpg/960px-Felis_catus-cat_on_snow.jpg",
+      "author": "Von.grzanka",
+      "license": "CC BY-SA 3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0"
+    },
+    {
+      "sample_id": "sample-03",
+      "title": "Cat playing with a lizard.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Cat_playing_with_a_lizard.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/Cat_playing_with_a_lizard.jpg/960px-Cat_playing_with_a_lizard.jpg",
+      "author": "Basile Morin",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0"
+    }
+  ],
+  "dog": [
+    {
+      "sample_id": "sample-01",
+      "title": "Golden retriever gnawing at the farmer's market.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Golden_retriever_gnawing_at_the_farmer's_market.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Golden_retriever_gnawing_at_the_farmer%27s_market.jpg/960px-Golden_retriever_gnawing_at_the_farmer%27s_market.jpg",
+      "author": "Grendelkhan",
+      "license": "CC BY-SA 3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0"
+    },
+    {
+      "sample_id": "sample-02",
+      "title": "Dülmen, Hausdülmen, Golden Retriever -- 2022 -- 5530.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Dülmen,_Hausdülmen,_Golden_Retriever_--_2022_--_5530.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/D%C3%BClmen%2C_Hausd%C3%BClmen%2C_Golden_Retriever_--_2022_--_5530.jpg/960px-D%C3%BClmen%2C_Hausd%C3%BClmen%2C_Golden_Retriever_--_2022_--_5530.jpg",
+      "author": "Dietmar Rabich",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    {
+      "sample_id": "sample-03",
+      "title": "Golden retriever ruede.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Golden_retriever_ruede.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/Golden_retriever_ruede.jpg/960px-Golden_retriever_ruede.jpg",
+      "author": "Dirk Vorderstraße",
+      "license": "CC BY 3.0",
+      "license_url": "https://creativecommons.org/licenses/by/3.0"
+    }
+  ],
+  "horse": [
+    {
+      "sample_id": "sample-01",
+      "title": "Horse December 2014-1.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Horse_December_2014-1.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Horse_December_2014-1.jpg/960px-Horse_December_2014-1.jpg",
+      "author": "Alvesgaspar",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    {
+      "sample_id": "sample-02",
+      "title": "Horse market in Lorenzkirch.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Horse_market_in_Lorenzkirch.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Horse_market_in_Lorenzkirch.jpg/960px-Horse_market_in_Lorenzkirch.jpg",
+      "author": "Unknown authorUnknown author",
+      "license": "Public domain",
+      "license_url": null
+    },
+    {
+      "sample_id": "sample-03",
+      "title": "Horse-drawn sleighs 2012 G1.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Horse-drawn_sleighs_2012_G1.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Horse-drawn_sleighs_2012_G1.jpg/960px-Horse-drawn_sleighs_2012_G1.jpg",
+      "author": "George Chernilevsky",
+      "license": "Public domain",
+      "license_url": null
+    }
+  ],
+  "eagle": [
+    {
+      "sample_id": "sample-01",
+      "title": "Black-chested snake-eagle (Circaetus pectoralis).jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Black-chested_snake-eagle_(Circaetus_pectoralis).jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Black-chested_snake-eagle_%28Circaetus_pectoralis%29.jpg/960px-Black-chested_snake-eagle_%28Circaetus_pectoralis%29.jpg",
+      "author": "Charles J. Sharp",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    {
+      "sample_id": "sample-02",
+      "title": "Crested hawk-eagle (Nisaetus cirrhatus ceylanensis) feeding on egret.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Crested_hawk-eagle_(Nisaetus_cirrhatus_ceylanensis)_feeding_on_egret.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/Crested_hawk-eagle_%28Nisaetus_cirrhatus_ceylanensis%29_feeding_on_egret.jpg/960px-Crested_hawk-eagle_%28Nisaetus_cirrhatus_ceylanensis%29_feeding_on_egret.jpg",
+      "author": "Charles J. Sharp",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    {
+      "sample_id": "sample-03",
+      "title": "001 Wild Golden Eagle and Majinghorn Pfyn-Finges Photo by Giles Laurent.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:001_Wild_Golden_Eagle_and_Majinghorn_Pfyn-Finges_Photo_by_Giles_Laurent.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/001_Wild_Golden_Eagle_and_Majinghorn_Pfyn-Finges_Photo_by_Giles_Laurent.jpg/960px-001_Wild_Golden_Eagle_and_Majinghorn_Pfyn-Finges_Photo_by_Giles_Laurent.jpg",
+      "author": "Giles Laurent",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0"
+    }
+  ],
+  "motorcycle": [
+    {
+      "sample_id": "sample-01",
+      "title": "Male Motorcycle rider posing with a Coventry Eagle racing bike, No. 116.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Male_Motorcycle_rider_posing_with_a_Coventry_Eagle_racing_bike,_No._116.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Male_Motorcycle_rider_posing_with_a_Coventry_Eagle_racing_bike%2C_No._116.jpg/960px-Male_Motorcycle_rider_posing_with_a_Coventry_Eagle_racing_bike%2C_No._116.jpg",
+      "author": "Australian Consolidated Press photographer",
+      "license": "Public domain",
+      "license_url": null
+    },
+    {
+      "sample_id": "sample-02",
+      "title": "Couple Riding Motorcycle in Bike lane W Lone Mountain Rd.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Couple_Riding_Motorcycle_in_Bike_lane_W_Lone_Mountain_Rd.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5d/Couple_Riding_Motorcycle_in_Bike_lane_W_Lone_Mountain_Rd.jpg/960px-Couple_Riding_Motorcycle_in_Bike_lane_W_Lone_Mountain_Rd.jpg",
+      "author": "Noah Wulf",
+      "license": "CC BY-SA 3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0"
+    },
+    {
+      "sample_id": "sample-03",
+      "title": "Male Motorcycle rider posing with a Rudge racing bike, No. 45.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Male_Motorcycle_rider_posing_with_a_Rudge_racing_bike,_No._45.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Male_Motorcycle_rider_posing_with_a_Rudge_racing_bike%2C_No._45.jpg/960px-Male_Motorcycle_rider_posing_with_a_Rudge_racing_bike%2C_No._45.jpg",
+      "author": "ACP Magazines Ltd.",
+      "license": "Public domain",
+      "license_url": null
+    }
+  ],
+  "bicycle": [
+    {
+      "sample_id": "sample-01",
+      "title": "African boy transporting fodder by bicycle edit.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:African_boy_transporting_fodder_by_bicycle_edit.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/African_boy_transporting_fodder_by_bicycle_edit.jpg/960px-African_boy_transporting_fodder_by_bicycle_edit.jpg",
+      "author": "Muhammad Mahdi Karim",
+      "license": "GFDL 1.2",
+      "license_url": "http://www.gnu.org/licenses/old-licenses/fdl-1.2.html"
+    },
+    {
+      "sample_id": "sample-02",
+      "title": "Man biking on Recife city.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Man_biking_on_Recife_city.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/95/Man_biking_on_Recife_city.jpg/960px-Man_biking_on_Recife_city.jpg",
+      "author": "Wilfredor",
+      "license": "CC0",
+      "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+    },
+    {
+      "sample_id": "sample-03",
+      "title": "Bicycle using for Citi Bike.jpeg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Bicycle_using_for_Citi_Bike.jpeg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/Bicycle_using_for_Citi_Bike.jpeg/960px-Bicycle_using_for_Citi_Bike.jpeg",
+      "author": "User:mikepanhu",
+      "license": "CC BY-SA 3.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0"
+    }
+  ],
+  "train": [
+    {
+      "sample_id": "sample-01",
+      "title": "Locomotive ChS4-072 2011 G1.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Locomotive_ChS4-072_2011_G1.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Locomotive_ChS4-072_2011_G1.jpg/960px-Locomotive_ChS4-072_2011_G1.jpg",
+      "author": "George Chernilevsky",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    {
+      "sample_id": "sample-02",
+      "title": "A train in Abergynolwyn station on the Talyllyn railway NLW3363937.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:A_train_in_Abergynolwyn_station_on_the_Talyllyn_railway_NLW3363937.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/b/b7/A_train_in_Abergynolwyn_station_on_the_Talyllyn_railway_NLW3363937.jpg",
+      "author": "Thomas, John,",
+      "license": "Public domain",
+      "license_url": null
+    },
+    {
+      "sample_id": "sample-03",
+      "title": "Steam locomotive gear (JŽ 06-018; Slovenia).jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Steam_locomotive_gear_(JŽ_06-018;_Slovenia).jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Steam_locomotive_gear_%28J%C5%BD_06-018%3B_Slovenia%29.jpg/960px-Steam_locomotive_gear_%28J%C5%BD_06-018%3B_Slovenia%29.jpg",
+      "author": "Petar Milošević",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0"
+    }
+  ],
+  "airplane": [
+    {
+      "sample_id": "sample-01",
+      "title": "Aerial photograph of airliners in flight.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Aerial_photograph_of_airliners_in_flight.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Aerial_photograph_of_airliners_in_flight.jpg/960px-Aerial_photograph_of_airliners_in_flight.jpg",
+      "author": "Yair-haklai",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    {
+      "sample_id": "sample-02",
+      "title": "Airliner approach to Tokyo 3.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Airliner_approach_to_Tokyo_3.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Airliner_approach_to_Tokyo_3.jpg/960px-Airliner_approach_to_Tokyo_3.jpg",
+      "author": "Syced",
+      "license": "CC0",
+      "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+    },
+    {
+      "sample_id": "sample-03",
+      "title": "Airliner approach to Tokyo.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Airliner_approach_to_Tokyo.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Airliner_approach_to_Tokyo.jpg/960px-Airliner_approach_to_Tokyo.jpg",
+      "author": "Syced",
+      "license": "CC0",
+      "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en"
+    }
+  ],
+  "castle": [
+    {
+      "sample_id": "sample-01",
+      "title": "Caerphilly Castle, Photograph (4641421).jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Caerphilly_Castle,_Photograph_(4641421).jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Caerphilly_Castle%2C_Photograph_%284641421%29.jpg/960px-Caerphilly_Castle%2C_Photograph_%284641421%29.jpg",
+      "author": "Martin Ridley",
+      "license": "Public domain",
+      "license_url": null
+    },
+    {
+      "sample_id": "sample-02",
+      "title": "Photograph of Cardiff Castle (4785945).jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Photograph_of_Cardiff_Castle_(4785945).jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Photograph_of_Cardiff_Castle_%284785945%29.jpg/960px-Photograph_of_Cardiff_Castle_%284785945%29.jpg",
+      "author": "Martin Ridley",
+      "license": "Public domain",
+      "license_url": null
+    },
+    {
+      "sample_id": "sample-03",
+      "title": "Edinburgh Castle from Grass Market.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Edinburgh_Castle_from_Grass_Market.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c4/Edinburgh_Castle_from_Grass_Market.jpg/960px-Edinburgh_Castle_from_Grass_Market.jpg",
+      "author": "George Washington Wilson / Adam Cuerden",
+      "license": "Public domain",
+      "license_url": null
+    }
+  ],
+  "lighthouse": [
+    {
+      "sample_id": "sample-01",
+      "title": "Cape May Lighthouse September 2020 002.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Cape_May_Lighthouse_September_2020_002.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a3/Cape_May_Lighthouse_September_2020_002.jpg/960px-Cape_May_Lighthouse_September_2020_002.jpg",
+      "author": "King of Hearts",
+      "license": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0"
+    },
+    {
+      "sample_id": "sample-02",
+      "title": "Lighthouse Aniva.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Lighthouse_Aniva.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/48/Lighthouse_Aniva.jpg/960px-Lighthouse_Aniva.jpg",
+      "author": "Pavelappps",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0"
+    },
+    {
+      "sample_id": "sample-03",
+      "title": "Osmussaar. Lighthouse..jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Osmussaar._Lighthouse..jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Osmussaar._Lighthouse..jpg/960px-Osmussaar._Lighthouse..jpg",
+      "author": "Aleksandr Abrosimov",
+      "license": "CC BY-SA 3.0 ee",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0/ee/deed.en"
+    }
+  ]
+}

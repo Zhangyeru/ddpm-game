@@ -272,7 +272,7 @@ input {
 
 .screen-image {
   object-fit: cover;
-  image-rendering: pixelated;
+  filter: saturate(1.02) contrast(1.02);
 }
 
 .screen-overlay {
@@ -293,13 +293,13 @@ input {
   background:
     repeating-linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.05) 0,
-      rgba(255, 255, 255, 0.05) 2px,
+      rgba(255, 255, 255, 0.035) 0,
+      rgba(255, 255, 255, 0.035) 2px,
       transparent 2px,
       transparent 8px
     );
   mix-blend-mode: screen;
-  opacity: 0.2;
+  opacity: 0.14;
   animation: scan 3s linear infinite;
 }
 

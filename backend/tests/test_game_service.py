@@ -55,26 +55,28 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(snapshot.stability, GAME_CONFIG.initial_session.stability)
         self.assertEqual(snapshot.corruption, GAME_CONFIG.initial_session.corruption)
 
-    def test_render_frame_returns_offline_manifest_svg(self) -> None:
+    def test_render_frame_returns_offline_manifest_asset(self) -> None:
         snapshot = self.service.start_session("player-a")
         session = self.service.sessions[snapshot.session_id]
         query = parse_qs(urlparse(snapshot.image_url).query)
         variant_key = query["variant"][0]
         token = query["token"][0]
 
-        svg = self.service.render_frame(
+        asset = self.service.render_frame(
             snapshot.session_id,
             snapshot.frame_index,
             variant_key,
             token,
         )
 
-        expected_svg = self.trajectory_store.get_frame_svg(
+        expected_asset = self.trajectory_store.get_frame(
             target_label=session.target.label,
+            sample_id=session.sample_id,
             variant_key=variant_key,
             frame_index=snapshot.frame_index,
         )
-        self.assertEqual(svg, expected_svg)
+        self.assertEqual(asset.path, expected_asset.path)
+        self.assertEqual(asset.media_type, "image/webp")
 
     def test_sessions_are_scoped_to_player_id(self) -> None:
         snapshot = self.service.start_session("player-a")
@@ -110,17 +112,31 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(result.score, expected_score)
         self.assertEqual(result.status, "won")
 
+    def test_sample_selection_stays_stable_within_session(self) -> None:
+        snapshot = self.service.start_session("player-a")
+        session = self.service.sessions[snapshot.session_id]
+        initial_sample_id = session.sample_id
+
+        self.service.step("player-a", snapshot.session_id)
+        self.service.use_card("player-a", snapshot.session_id, "sharpen-outline")
+        self.service.freeze("player-a", snapshot.session_id, "center")
+
+        self.assertEqual(self.service.sessions[snapshot.session_id].sample_id, initial_sample_id)
+
 
 class TrajectoryStoreTest(unittest.TestCase):
-    def test_get_frame_svg_decodes_manifest_data_uri(self) -> None:
+    def test_get_frame_returns_binary_asset_metadata(self) -> None:
         store = TrajectoryStore()
         target_label = store.target_labels[0]
+        sample_id = store.sample_ids_for_target(target_label)[0]
 
-        encoded_frame = store.get_frame(target_label, "base", 0)
-        decoded_frame = store.get_frame_svg(target_label, "base", 0)
+        asset = store.get_frame(target_label, sample_id, "base", 0)
+        content = asset.read_bytes()
 
-        self.assertTrue(encoded_frame.startswith("data:image/svg+xml;utf8,"))
-        self.assertTrue(decoded_frame.startswith("<svg"))
+        self.assertTrue(asset.path.exists())
+        self.assertEqual(asset.media_type, "image/webp")
+        self.assertEqual(content[:4], b"RIFF")
+        self.assertEqual(content[8:12], b"WEBP")
 
 
 if __name__ == "__main__":
