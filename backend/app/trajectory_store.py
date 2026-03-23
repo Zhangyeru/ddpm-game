@@ -28,8 +28,10 @@ class TrajectoryStore:
         if int(data.get("version", 0)) < 2:
             raise ValueError("轨迹清单版本过旧，请重新生成真实图片轨迹资源。")
 
+        self.version = int(data["version"])
         self.total_frames = int(data["total_frames"])
         self.variant_keys = tuple(data["variant_keys"])
+        self.generator_metadata: dict[str, object] = dict(data.get("generator") or {})
         self.targets: dict[str, dict[str, object]] = data["targets"]
         self.target_labels = tuple(self.targets.keys())
 

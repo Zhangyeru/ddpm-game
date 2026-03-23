@@ -3,108 +3,79 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-DEFAULT_TOTAL_FRAMES = 24
+DEFAULT_TOTAL_FRAMES = 100
 FRAME_IMAGE_SIZE = (384, 384)
 FRAME_OUTPUT_FORMAT = "WEBP"
 FRAME_OUTPUT_SUFFIX = ".webp"
+DEFAULT_MODEL_ID = "runwayml/stable-diffusion-v1-5"
 
 
 @dataclass(frozen=True)
 class TrajectoryVariant:
     key: str
-    clarity_boost: float = 0.0
-    blur_scale: float = 1.0
-    noise_scale: float = 1.0
-    contrast_scale: float = 1.0
-    saturation_scale: float = 1.0
-    brightness_bias: float = 0.0
-    tint_color: tuple[int, int, int] | None = None
-    tint_strength: float = 0.0
-    overlay_mode: str | None = None
+    prompt_suffix: str = ""
+    guidance_scale: float = 5.0
+    negative_prompt: str | None = None
+    wrong_family: bool = False
+    corruption_noise_scale: float = 0.0
+    corruption_noise_points: tuple[float, ...] = ()
     frozen_region: str | None = None
+    reference_lead_steps: int = 0
 
 
 TRAJECTORY_VARIANTS: dict[str, TrajectoryVariant] = {
-    "base": TrajectoryVariant(key="base"),
+    "base": TrajectoryVariant(
+        key="base",
+        prompt_suffix="high quality photo, natural lighting",
+        guidance_scale=5.0,
+    ),
     "focus_generic": TrajectoryVariant(
         key="focus_generic",
-        clarity_boost=0.12,
-        blur_scale=0.78,
-        noise_scale=0.7,
-        contrast_scale=1.08,
-        saturation_scale=1.04,
+        prompt_suffix="sharp silhouette, clearer structure, higher detail",
+        guidance_scale=6.5,
     ),
     "focus_machine": TrajectoryVariant(
         key="focus_machine",
-        clarity_boost=0.18,
-        blur_scale=0.64,
-        noise_scale=0.58,
-        contrast_scale=1.16,
-        saturation_scale=0.98,
-        tint_color=(74, 170, 210),
-        tint_strength=0.08,
+        prompt_suffix="mechanical details, metallic structure, crisp geometry",
+        guidance_scale=7.0,
     ),
     "focus_living": TrajectoryVariant(
         key="focus_living",
-        clarity_boost=0.18,
-        blur_scale=0.62,
-        noise_scale=0.56,
-        contrast_scale=1.12,
-        saturation_scale=1.12,
-        tint_color=(243, 193, 94),
-        tint_strength=0.08,
+        prompt_suffix="organic details, fur, anatomy, natural texture",
+        guidance_scale=7.0,
     ),
     "pulse_reveal": TrajectoryVariant(
         key="pulse_reveal",
-        clarity_boost=0.16,
-        blur_scale=0.7,
-        noise_scale=0.6,
-        contrast_scale=1.1,
-        saturation_scale=1.06,
-        overlay_mode="pulse",
+        prompt_suffix="crisp features, highly detailed, clearer edges",
+        guidance_scale=8.0,
     ),
     "misguided": TrajectoryVariant(
         key="misguided",
-        clarity_boost=-0.06,
-        blur_scale=1.15,
-        noise_scale=1.22,
-        contrast_scale=0.94,
-        saturation_scale=0.88,
-        tint_color=(200, 120, 50),
-        tint_strength=0.14,
-        overlay_mode="misguided",
+        prompt_suffix="wrong semantic emphasis, misleading details",
+        guidance_scale=7.0,
+        wrong_family=True,
+        negative_prompt="accurate category details, clean reconstruction",
     ),
     "corrupted": TrajectoryVariant(
         key="corrupted",
-        clarity_boost=-0.1,
-        blur_scale=1.28,
-        noise_scale=1.38,
-        contrast_scale=0.9,
-        saturation_scale=0.82,
-        brightness_bias=-0.04,
-        tint_color=(160, 70, 70),
-        tint_strength=0.2,
-        overlay_mode="corrupted",
+        prompt_suffix="unstable image, corrupted details, fragmented structure",
+        guidance_scale=6.0,
+        corruption_noise_scale=0.03,
+        corruption_noise_points=(0.2, 0.4, 0.6, 0.8),
     ),
     "freeze_upper_left": TrajectoryVariant(
         key="freeze_upper_left",
-        clarity_boost=0.08,
-        blur_scale=0.86,
-        noise_scale=0.82,
         frozen_region="upper-left",
+        reference_lead_steps=8,
     ),
     "freeze_center": TrajectoryVariant(
         key="freeze_center",
-        clarity_boost=0.1,
-        blur_scale=0.82,
-        noise_scale=0.78,
         frozen_region="center",
+        reference_lead_steps=10,
     ),
     "freeze_lower_right": TrajectoryVariant(
         key="freeze_lower_right",
-        clarity_boost=0.08,
-        blur_scale=0.86,
-        noise_scale=0.82,
         frozen_region="lower-right",
+        reference_lead_steps=8,
     ),
 }

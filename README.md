@@ -17,7 +17,7 @@ This repository now contains a playable scaffold for the DDPM web game concept f
 - Supports one freeze-region action
 - Scores a round and reveals the target on win/loss
 
-The backend now reads a local offline trajectory manifest from `backend/assets/trajectories/manifest.json`. The manifest is generated from bundled source photos in `backend/assets/source-images/` and stores precomputed `webp` frame paths for each target, sample, and guidance variant.
+The backend now reads a local offline trajectory manifest from `backend/assets/trajectories/manifest.json`. The current checked-in manifest still ships precomputed `webp` frame paths, and the generator has been upgraded to support 100-step real DDIM inversion trajectories from bundled source photos in `backend/assets/source-images/`.
 
 If you need to refresh the bundled seed photos from Wikimedia Commons:
 
@@ -30,6 +30,24 @@ If you need to regenerate the offline trajectories:
 ```bash
 python3 backend/scripts/generate_trajectory_assets.py
 ```
+
+Useful generation flags:
+
+```bash
+python3 backend/scripts/generate_trajectory_assets.py \
+  --device auto \
+  --model-id runwayml/stable-diffusion-v1-5 \
+  --num-steps 100 \
+  --targets cat \
+  --sample-ids sample-01 \
+  --variant-keys base \
+  --output-root /tmp/game-demo-trajectories
+```
+
+Notes:
+
+- Full 100-step asset refresh is intended for a CUDA machine.
+- CPU generation is supported for small scoped runs, but it is slow.
 
 ## Run The Backend
 
@@ -60,7 +78,7 @@ VITE_API_BASE_URL=http://localhost:8000/api npm run dev
 
 ## Next Recommended Steps
 
-1. Curate or replace the bundled source photos with a more consistent art direction.
-2. Swap polling for WebSocket pushes if you want smoother pacing.
-3. Add a lightweight level config system and persistent progression.
-4. Move from candidate-only guessing to optional typed guesses once the base pacing feels right.
+1. Run the full 100-step diffusion refresh on a GPU box and replace the checked-in 24-frame manifest.
+2. Curate or replace the bundled source photos with a more consistent art direction.
+3. Swap polling for WebSocket pushes if you want smoother pacing.
+4. Add a lightweight level config system and persistent progression.

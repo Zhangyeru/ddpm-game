@@ -36,28 +36,29 @@ class RoundStructureConfig:
 
 @dataclass(frozen=True)
 class RiskDelta:
-    stability: int = 0
-    corruption: int = 0
+    stability: float = 0.0
+    corruption: float = 0.0
     score: int = 0
 
 
 @dataclass(frozen=True)
 class ActionTuning:
-    step: RiskDelta = RiskDelta(stability=-2, corruption=4)
+    step_round_stability_loss: float = 46.0
+    step_round_corruption_gain: float = 92.0
     wrong_guess: RiskDelta = RiskDelta(stability=-12, corruption=14, score=-18)
     sharpen_outline: RiskDelta = RiskDelta(stability=5, corruption=-4, score=8)
     matched_card: RiskDelta = RiskDelta(stability=7, corruption=-6, score=14)
     mismatched_card: RiskDelta = RiskDelta(stability=-5, corruption=8)
     freeze: RiskDelta = RiskDelta(stability=6, corruption=5)
     pulse_scan: RiskDelta = RiskDelta(stability=-3, corruption=8)
-    pulse_frame_cost: int = 1
+    pulse_frame_cost_ratio: float = 1 / 24
 
 
 @dataclass(frozen=True)
 class ScoreTuning:
     win_base: int = 120
     early_bonus_max: int = 70
-    time_bonus_per_frame: int = 4
+    max_time_bonus: int = 92
     stability_bonus_divisor: int = 2
     corruption_bonus_base: int = 32
     corruption_bonus_divisor: int = 3
@@ -73,11 +74,12 @@ class ScoreTuning:
 
 @dataclass(frozen=True)
 class PresentationTuning:
-    step_interval_ms: int = 900
+    target_round_duration_ms: int = 20_000
+    min_step_interval_ms: int = 120
     session_ttl_seconds: int = 30 * 60
     corrupted_variant_threshold: int = 70
-    progress_event_frames: frozenset[int] = frozenset({4, 9, 14, 19})
-    high_corruption_event_frames: frozenset[int] = frozenset({10, 16, 21})
+    progress_event_points: tuple[float, ...] = (0.2, 0.4, 0.6, 0.8)
+    high_corruption_event_points: tuple[float, ...] = (0.25, 0.5, 0.75, 0.9)
 
 
 @dataclass(frozen=True)
@@ -142,6 +144,7 @@ def calculate_win_score(
     *,
     progress: float,
     frames_remaining: int,
+    total_frames: int,
     stability: int,
     corruption: int,
     cards_remaining: int,
@@ -150,7 +153,7 @@ def calculate_win_score(
     remaining_guesses: int,
 ) -> int:
     early_bonus = int((1 - progress) * GAME_CONFIG.scoring.early_bonus_max)
-    time_bonus = frames_remaining * GAME_CONFIG.scoring.time_bonus_per_frame
+    time_bonus = calculate_time_bonus(frames_remaining=frames_remaining, total_frames=total_frames)
     stability_bonus = stability // GAME_CONFIG.scoring.stability_bonus_divisor
     corruption_bonus = max(
         0,
@@ -212,3 +215,46 @@ def card_effect(card_id: str, *, matched: bool) -> RiskDelta:
     if matched:
         return GAME_CONFIG.actions.matched_card
     return GAME_CONFIG.actions.mismatched_card
+
+
+def step_risk(total_frames: int) -> RiskDelta:
+    step_count = max(1, total_frames - 1)
+    return RiskDelta(
+        stability=-(GAME_CONFIG.actions.step_round_stability_loss / step_count),
+        corruption=GAME_CONFIG.actions.step_round_corruption_gain / step_count,
+    )
+
+
+def pulse_frame_cost(total_frames: int) -> int:
+    return max(1, round(total_frames * GAME_CONFIG.actions.pulse_frame_cost_ratio))
+
+
+def calculate_time_bonus(*, frames_remaining: int, total_frames: int) -> int:
+    denominator = max(1, total_frames - 1)
+    ratio = max(0.0, min(1.0, frames_remaining / denominator))
+    return int(round(ratio * GAME_CONFIG.scoring.max_time_bonus))
+
+
+def step_interval_ms(total_frames: int) -> int:
+    return max(
+        GAME_CONFIG.presentation.min_step_interval_ms,
+        round(GAME_CONFIG.presentation.target_round_duration_ms / max(1, total_frames)),
+    )
+
+
+def progress_event_frames(total_frames: int) -> frozenset[int]:
+    return _milestone_frames(total_frames, GAME_CONFIG.presentation.progress_event_points)
+
+
+def high_corruption_event_frames(total_frames: int) -> frozenset[int]:
+    return _milestone_frames(total_frames, GAME_CONFIG.presentation.high_corruption_event_points)
+
+
+def _milestone_frames(total_frames: int, points: tuple[float, ...]) -> frozenset[int]:
+    last_index = max(0, total_frames - 1)
+    frames = {
+        max(1, min(last_index - 1, int(last_index * point)))
+        for point in points
+        if last_index >= 2
+    }
+    return frozenset(frames)

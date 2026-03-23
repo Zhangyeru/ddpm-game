@@ -16,8 +16,13 @@ from .gameplay_config import (
     calculate_win_score,
     card_effect,
     chapter_and_level_for_round,
+    high_corruption_event_frames,
     mission_for_round,
     phase_label,
+    progress_event_frames,
+    pulse_frame_cost,
+    step_interval_ms,
+    step_risk,
     threat_label,
 )
 from .game_data import (
@@ -31,7 +36,6 @@ from .schemas import CardOption, FreezeRegionOption, SessionSnapshot
 from .trajectory_store import FrameAsset, TrajectoryStore
 
 
-STEP_INTERVAL_MS = GAME_CONFIG.presentation.step_interval_ms
 SESSION_TTL_SECONDS = GAME_CONFIG.presentation.session_ttl_seconds
 MAX_GUESSES = GAME_CONFIG.resources.max_guesses
 MAX_CARDS = GAME_CONFIG.resources.max_cards
@@ -56,8 +60,8 @@ class Session:
     combo: int = 0
     status: str = "playing"
     frames_remaining: int = 0
-    stability: int = 0
-    corruption: int = 0
+    stability: float = 0.0
+    corruption: float = 0.0
     scan_charges: int = MAX_SCAN_CHARGES
     frame_index: int = 0
     total_frames: int = DEFAULT_TOTAL_FRAMES
@@ -173,18 +177,19 @@ class GameService:
 
             session.frame_index = min(session.total_frames - 1, session.frame_index + 1)
             session.frames_remaining = max(0, session.frames_remaining - 1)
+            step_delta = step_risk(session.total_frames)
             self._shift_risk(
                 session,
-                stability_delta=GAME_CONFIG.actions.step.stability,
-                corruption_delta=GAME_CONFIG.actions.step.corruption,
+                stability_delta=step_delta.stability,
+                corruption_delta=step_delta.corruption,
             )
 
-            if session.frame_index in GAME_CONFIG.presentation.progress_event_frames:
+            if session.frame_index in progress_event_frames(session.total_frames):
                 self._append_event(session, self._progress_message(session))
 
             if (
                 session.corruption >= GAME_CONFIG.presentation.corrupted_variant_threshold
-                and session.frame_index in GAME_CONFIG.presentation.high_corruption_event_frames
+                and session.frame_index in high_corruption_event_frames(session.total_frames)
             ):
                 self._append_event(session, "污染度过高，画面开始出现伪轮廓和裂缝。")
 
@@ -209,8 +214,9 @@ class GameService:
                     session.mission_type,
                     progress=progress,
                     frames_remaining=session.frames_remaining,
-                    stability=session.stability,
-                    corruption=session.corruption,
+                    total_frames=session.total_frames,
+                    stability=round(session.stability),
+                    corruption=round(session.corruption),
                     cards_remaining=session.cards_remaining,
                     freeze_available=session.freeze_available,
                     scan_charges=session.scan_charges,
@@ -311,7 +317,7 @@ class GameService:
             session.signature_revealed = True
             session.frames_remaining = max(
                 0,
-                session.frames_remaining - GAME_CONFIG.actions.pulse_frame_cost,
+                session.frames_remaining - pulse_frame_cost(session.total_frames),
             )
             self._shift_risk(
                 session,
@@ -387,8 +393,8 @@ class GameService:
         self,
         session: Session,
         *,
-        stability_delta: int = 0,
-        corruption_delta: int = 0,
+        stability_delta: float = 0.0,
+        corruption_delta: float = 0.0,
     ) -> None:
         session.stability = max(0, min(MAX_STABILITY, session.stability + stability_delta))
         session.corruption = max(0, min(MAX_CORRUPTION, session.corruption + corruption_delta))
@@ -429,6 +435,9 @@ class GameService:
     def _snapshot(self, session: Session) -> SessionSnapshot:
         progress = session.frame_index / max(session.total_frames - 1, 1)
         variant_key = self._resolve_variant_key(session)
+        stability_value = round(session.stability)
+        corruption_value = round(session.corruption)
+        interval_ms = step_interval_ms(session.total_frames)
         return SessionSnapshot(
             session_id=session.session_id,
             chapter=session.chapter,
@@ -437,9 +446,9 @@ class GameService:
             combo=session.combo,
             status=session.status,
             frames_remaining=session.frames_remaining,
-            seconds_remaining=round((session.frames_remaining * STEP_INTERVAL_MS) / 1000, 1),
-            stability=session.stability,
-            corruption=session.corruption,
+            seconds_remaining=round((session.frames_remaining * interval_ms) / 1000, 1),
+            stability=stability_value,
+            corruption=corruption_value,
             scan_charges=session.scan_charges,
             frame_index=session.frame_index,
             total_frames=session.total_frames,
@@ -460,8 +469,8 @@ class GameService:
             signature_revealed=session.signature_revealed,
             phase_label=self._phase_label(session),
             mission_title=session.mission_title,
-            threat_label=self._threat_label(session.corruption),
-            step_interval_ms=STEP_INTERVAL_MS,
+            threat_label=self._threat_label(corruption_value),
+            step_interval_ms=interval_ms,
         )
 
     def _frame_url(self, session: Session, frame_index: int, variant_key: str) -> str:
@@ -528,7 +537,7 @@ class GameService:
 
     def _phase_label(self, session: Session) -> str:
         progress = session.frame_index / max(session.total_frames - 1, 1)
-        return phase_label(progress=progress, corruption=session.corruption)
+        return phase_label(progress=progress, corruption=round(session.corruption))
 
     def _threat_label(self, corruption: int) -> str:
         return threat_label(corruption)

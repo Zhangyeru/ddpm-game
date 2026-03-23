@@ -15,6 +15,7 @@ class CardDefinition:
 class TargetDefinition:
     asset_key: str
     label: str
+    prompt_token: str
     family: str
     hint: str
     signature: str
@@ -74,6 +75,7 @@ TARGETS: tuple[TargetDefinition, ...] = (
     TargetDefinition(
         asset_key="cat",
         label="猫",
+        prompt_token="cat",
         family="living",
         hint="谱带：生物 / 家养",
         signature="特征签名：尖耳、胡须与圆形头部",
@@ -82,6 +84,7 @@ TARGETS: tuple[TargetDefinition, ...] = (
     TargetDefinition(
         asset_key="dog",
         label="狗",
+        prompt_token="dog",
         family="living",
         hint="谱带：生物 / 伴侣",
         signature="特征签名：下垂耳、长吻与友好面部轮廓",
@@ -90,6 +93,7 @@ TARGETS: tuple[TargetDefinition, ...] = (
     TargetDefinition(
         asset_key="horse",
         label="马",
+        prompt_token="horse",
         family="living",
         hint="谱带：生物 / 牧场",
         signature="特征签名：长脸、鬃毛与高挑四肢",
@@ -98,6 +102,7 @@ TARGETS: tuple[TargetDefinition, ...] = (
     TargetDefinition(
         asset_key="eagle",
         label="鹰",
+        prompt_token="eagle",
         family="living",
         hint="谱带：生物 / 猛禽",
         signature="特征签名：钩状喙、张开双翼与锐利眼部轮廓",
@@ -106,6 +111,7 @@ TARGETS: tuple[TargetDefinition, ...] = (
     TargetDefinition(
         asset_key="motorcycle",
         label="摩托车",
+        prompt_token="motorcycle",
         family="machine",
         hint="谱带：机械 / 公路",
         signature="特征签名：车把、外露车轮与纵向车身",
@@ -114,6 +120,7 @@ TARGETS: tuple[TargetDefinition, ...] = (
     TargetDefinition(
         asset_key="bicycle",
         label="自行车",
+        prompt_token="bicycle",
         family="machine",
         hint="谱带：机械 / 骑行",
         signature="特征签名：细车架、车把与双轮结构",
@@ -122,6 +129,7 @@ TARGETS: tuple[TargetDefinition, ...] = (
     TargetDefinition(
         asset_key="train",
         label="火车",
+        prompt_token="train",
         family="machine",
         hint="谱带：机械 / 轨道",
         signature="特征签名：长车厢、前端车头与轨道场景",
@@ -130,6 +138,7 @@ TARGETS: tuple[TargetDefinition, ...] = (
     TargetDefinition(
         asset_key="airplane",
         label="飞机",
+        prompt_token="airplane",
         family="machine",
         hint="谱带：机械 / 航空",
         signature="特征签名：机翼、尾翼与细长机身",
@@ -138,6 +147,7 @@ TARGETS: tuple[TargetDefinition, ...] = (
     TargetDefinition(
         asset_key="castle",
         label="城堡",
+        prompt_token="castle",
         family="structure",
         hint="谱带：建筑 / 防御",
         signature="特征签名：塔楼、城垛与拱门",
@@ -146,6 +156,7 @@ TARGETS: tuple[TargetDefinition, ...] = (
     TargetDefinition(
         asset_key="lighthouse",
         label="灯塔",
+        prompt_token="lighthouse",
         family="structure",
         hint="谱带：建筑 / 海岸",
         signature="特征签名：高塔、灯室与临海轮廓",

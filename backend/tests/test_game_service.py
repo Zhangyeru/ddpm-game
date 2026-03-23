@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from urllib.parse import parse_qs, urlparse
 
 from backend.app.gameplay_config import (
@@ -102,6 +104,7 @@ class GameServiceTest(unittest.TestCase):
             session.mission_type,
             progress=0,
             frames_remaining=snapshot.frames_remaining,
+            total_frames=snapshot.total_frames,
             stability=snapshot.stability,
             corruption=snapshot.corruption,
             cards_remaining=snapshot.cards_remaining,
@@ -137,6 +140,46 @@ class TrajectoryStoreTest(unittest.TestCase):
         self.assertEqual(asset.media_type, "image/webp")
         self.assertEqual(content[:4], b"RIFF")
         self.assertEqual(content[8:12], b"WEBP")
+
+    def test_version_3_manifest_preserves_generator_metadata(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            asset_path = root / "generated" / "cat" / "sample-01" / "base" / "000.webp"
+            asset_path.parent.mkdir(parents=True)
+            asset_path.write_bytes(b"RIFF0000WEBP")
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(
+                """
+                {
+                  "version": 3,
+                  "total_frames": 100,
+                  "variant_keys": ["base"],
+                  "generator": {
+                    "model_id": "hf-internal-testing/tiny-stable-diffusion-pipe",
+                    "scheduler": "ddim_inversion",
+                    "num_steps": 100,
+                    "device_mode": "cpu"
+                  },
+                  "targets": {
+                    "猫": {
+                      "samples": {
+                        "sample-01": {
+                          "variants": {
+                            "base": ["generated/cat/sample-01/base/000.webp"]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                """.strip(),
+                encoding="utf-8",
+            )
+
+            store = TrajectoryStore(manifest_path)
+
+            self.assertEqual(store.version, 3)
+            self.assertEqual(store.generator_metadata["scheduler"], "ddim_inversion")
 
 
 if __name__ == "__main__":
