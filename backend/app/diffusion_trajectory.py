@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Protocol
 
 import numpy as np
@@ -14,11 +13,6 @@ from .game_data import TargetDefinition
 DEFAULT_NEGATIVE_PROMPT = (
     "low quality, blurry, distorted, abstract, illustration, painting, extra limbs, mutated"
 )
-FAMILY_SUBJECTS: dict[str, str] = {
-    "living": "animal",
-    "machine": "vehicle or machine",
-    "structure": "building",
-}
 WRONG_FAMILY_SUBJECTS: dict[str, str] = {
     "living": "vehicle or machine",
     "machine": "animal",
@@ -40,6 +34,7 @@ class DiffusionBackend(Protocol):
         image: Image.Image,
         prompt: str,
         negative_prompt: str,
+        inversion_guidance_scale: float,
         guidance_scale: float,
         total_frames: int,
         seed: int,
@@ -59,6 +54,7 @@ class DiffusionDependencyError(RuntimeError):
 class VariantGenerationPlan:
     prompt: str
     negative_prompt: str
+    inversion_guidance_scale: float
     guidance_scale: float
     frozen_region: str | None
     reference_lead_steps: int
@@ -84,10 +80,11 @@ class DiffusionTrajectoryGenerator:
         variant: TrajectoryVariant,
     ) -> list[Image.Image]:
         plan = resolve_variant_plan(target=target, variant=variant)
-        return self.backend.generate_frames(
+        frames = self.backend.generate_frames(
             image=image,
             prompt=plan.prompt,
             negative_prompt=plan.negative_prompt,
+            inversion_guidance_scale=plan.inversion_guidance_scale,
             guidance_scale=plan.guidance_scale,
             total_frames=self.config.num_steps,
             seed=stable_seed(target.asset_key, sample_id, variant.key),
@@ -96,6 +93,9 @@ class DiffusionTrajectoryGenerator:
             corruption_noise_scale=plan.corruption_noise_scale,
             corruption_noise_points=plan.corruption_noise_points,
         )
+        if frames:
+            frames[-1] = image.copy()
+        return frames
 
 
 def resolve_variant_plan(
@@ -114,6 +114,7 @@ def resolve_variant_plan(
     return VariantGenerationPlan(
         prompt=", ".join(prompt_segments),
         negative_prompt=variant.negative_prompt or DEFAULT_NEGATIVE_PROMPT,
+        inversion_guidance_scale=variant.inversion_guidance_scale,
         guidance_scale=variant.guidance_scale,
         frozen_region=variant.frozen_region,
         reference_lead_steps=variant.reference_lead_steps,
@@ -182,6 +183,7 @@ class DiffusersDDIMBackend:
         image: Image.Image,
         prompt: str,
         negative_prompt: str,
+        inversion_guidance_scale: float,
         guidance_scale: float,
         total_frames: int,
         seed: int,
@@ -196,7 +198,7 @@ class DiffusersDDIMBackend:
             latents=clean_latents,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
-            guidance_scale=guidance_scale,
+            guidance_scale=inversion_guidance_scale,
             total_frames=total_frames,
         )
         reverse_latents = self._reverse_denoise(
@@ -247,7 +249,7 @@ class DiffusersDDIMBackend:
         image_tensor = image_tensor.to(device=self.device, dtype=self.dtype)
         image_tensor = image_tensor * 2.0 - 1.0
         with self.torch.inference_mode():
-            latents = self.pipeline.vae.encode(image_tensor).latent_dist.sample()
+            latents = self.pipeline.vae.encode(image_tensor).latent_dist.mode()
         return latents * self.pipeline.vae.config.scaling_factor
 
     def _invert(

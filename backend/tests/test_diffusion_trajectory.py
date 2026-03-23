@@ -32,7 +32,8 @@ class DiffusionTrajectoryTest(unittest.TestCase):
 
         self.assertIn("cat", plan.prompt)
         self.assertIn("organic details", plan.prompt)
-        self.assertGreater(plan.guidance_scale, 5.0)
+        self.assertGreater(plan.guidance_scale, 1.0)
+        self.assertLess(plan.inversion_guidance_scale, plan.guidance_scale)
 
     def test_misguided_variant_switches_to_wrong_family_prompt(self) -> None:
         target = TARGETS[0]
@@ -57,6 +58,28 @@ class DiffusionTrajectoryTest(unittest.TestCase):
 
         self.assertEqual(len(frames), 100)
         self.assertEqual(backend.calls[0]["total_frames"], 100)
+        self.assertEqual(backend.calls[0]["inversion_guidance_scale"], 0.0)
+
+    def test_base_variant_keeps_source_image_as_last_frame(self) -> None:
+        source = Image.new("RGB", (16, 16), "white")
+
+        class EchoBackend:
+            def generate_frames(self, **kwargs) -> list[Image.Image]:
+                return [Image.new("RGB", (16, 16), "black") for _ in range(kwargs["total_frames"])]
+
+        generator = DiffusionTrajectoryGenerator(
+            GenerationConfig(num_steps=4, device="cpu"),
+            backend=EchoBackend(),
+        )
+
+        frames = generator.generate_variant_frames(
+            image=source,
+            target=TARGETS[0],
+            sample_id="sample-01",
+            variant=TRAJECTORY_VARIANTS["base"],
+        )
+
+        self.assertEqual(frames[-1].tobytes(), source.tobytes())
 
     def test_corruption_and_region_helpers_match_100_step_plan(self) -> None:
         self.assertEqual(corruption_step_indices(100, (0.2, 0.4, 0.6, 0.8)), {19, 39, 59, 79})
