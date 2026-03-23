@@ -26,6 +26,7 @@ def main() -> None:
             target.label: {
                 "family": target.family,
                 "hint": target.hint,
+                "signature": target.signature,
                 "variants": generate_target_trajectories(target, DEFAULT_TOTAL_FRAMES),
             }
             for target in TARGETS

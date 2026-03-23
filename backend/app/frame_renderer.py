@@ -44,12 +44,26 @@ TRAJECTORY_VARIANTS: dict[str, TrajectoryVariant] = {
         jitter_scale=0.62,
         overlay_mode="living",
     ),
+    "pulse_reveal": TrajectoryVariant(
+        key="pulse_reveal",
+        clarity_boost=0.16,
+        noise_scale=0.74,
+        jitter_scale=0.68,
+        overlay_mode="pulse",
+    ),
     "misguided": TrajectoryVariant(
         key="misguided",
         clarity_boost=-0.05,
         noise_scale=1.18,
         jitter_scale=1.25,
         overlay_mode="misguided",
+    ),
+    "corrupted": TrajectoryVariant(
+        key="corrupted",
+        clarity_boost=-0.08,
+        noise_scale=1.28,
+        jitter_scale=1.35,
+        overlay_mode="corrupted",
     ),
     "freeze_upper_left": TrajectoryVariant(
         key="freeze_upper_left",
@@ -99,12 +113,33 @@ def render_frame_data_uri(
     total_frames: int,
     variant_key: str,
 ) -> str:
+    svg = render_frame_svg(
+        target=target,
+        frame_index=frame_index,
+        total_frames=total_frames,
+        variant_key=variant_key,
+    )
+    return f"data:image/svg+xml;utf8,{urllib.parse.quote(svg)}"
+
+
+def render_frame_svg(
+    target: TargetDefinition,
+    frame_index: int,
+    total_frames: int,
+    variant_key: str,
+) -> str:
     variant = TRAJECTORY_VARIANTS[variant_key]
     progress = frame_index / max(total_frames - 1, 1)
     clarity = _clamp(0.08 + progress * 0.72 + variant.clarity_boost, 0.05, 0.98)
     rng = random.Random(f"{target.label}:{variant_key}:{frame_index}")
     frozen_region = _region_bounds(variant.frozen_region)
 
+    scene_markup = _draw_scene(
+        target=target,
+        clarity=clarity,
+        variant=variant,
+        progress=progress,
+    )
     target_markup = _draw_target(
         target=target,
         clarity=clarity,
@@ -118,8 +153,13 @@ def render_frame_data_uri(
         frozen_region=frozen_region,
     )
     overlay_markup = _draw_overlay(variant=variant, clarity=clarity)
+    foreground_markup = _draw_foreground(
+        target=target,
+        clarity=clarity,
+        variant=variant,
+    )
 
-    svg = f"""
+    return f"""
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="离线去噪轨迹帧">
   <defs>
     <radialGradient id="bg" cx="50%" cy="42%" r="70%">
@@ -127,8 +167,14 @@ def render_frame_data_uri(
       <stop offset="55%" stop-color="#0b1720" />
       <stop offset="100%" stop-color="#05080d" />
     </radialGradient>
+    <linearGradient id="beam" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#72d6c9" stop-opacity="0.0" />
+      <stop offset="45%" stop-color="#72d6c9" stop-opacity="0.18" />
+      <stop offset="100%" stop-color="#72d6c9" stop-opacity="0.0" />
+    </linearGradient>
   </defs>
   <rect width="64" height="64" fill="url(#bg)" rx="6" />
+  {scene_markup}
   <g stroke="#ffffff" stroke-opacity="0.04" stroke-width="0.45">
     <path d="M8 0V64M16 0V64M24 0V64M32 0V64M40 0V64M48 0V64M56 0V64" />
     <path d="M0 8H64M0 16H64M0 24H64M0 32H64M0 40H64M0 48H64M0 56H64" />
@@ -136,10 +182,9 @@ def render_frame_data_uri(
   {noise_markup}
   {target_markup}
   {overlay_markup}
+  {foreground_markup}
 </svg>
 """.strip()
-
-    return f"data:image/svg+xml;utf8,{urllib.parse.quote(svg)}"
 
 
 def _draw_noise(
@@ -203,11 +248,38 @@ def _draw_overlay(variant: TrajectoryVariant, clarity: float) -> str:
             "</g>"
         )
 
+    if variant.overlay_mode == "pulse":
+        fragments.append(
+            '<g fill="none" stroke="#8fd3ff" stroke-opacity="0.34" stroke-width="0.8">'
+            '<circle cx="32" cy="32" r="24" />'
+            '<circle cx="32" cy="32" r="15" />'
+            '<path d="M4 32H60M32 4V60" />'
+            "</g>"
+        )
+        fragments.append(
+            '<rect x="-10" y="26" width="84" height="12" fill="url(#beam)" />'
+        )
+
     if variant.overlay_mode == "misguided":
         fragments.append(
             '<g fill="none" stroke="#ff7a7a" stroke-opacity="0.26" stroke-width="0.8">'
             '<path d="M16 16L48 48M48 16L16 48" />'
             '<circle cx="32" cy="32" r="18" />'
+            "</g>"
+        )
+
+    if variant.overlay_mode == "corrupted":
+        fragments.append(
+            '<g fill="none" stroke="#ff7a7a" stroke-opacity="0.32" stroke-width="0.9">'
+            '<path d="M8 18L22 14L36 18L52 11" />'
+            '<path d="M12 43L28 39L41 44L56 40" />'
+            '<path d="M14 10L18 54M48 8L44 56" />'
+            "</g>"
+        )
+        fragments.append(
+            '<g fill="#ff7a7a" fill-opacity="0.08">'
+            '<rect x="0" y="0" width="64" height="6" />'
+            '<rect x="0" y="58" width="64" height="6" />'
             "</g>"
         )
 
@@ -240,14 +312,6 @@ def _draw_target(
     jitter = max(0.2, (1 - clarity) * 2.6 * jitter_scale)
     dx = rng.uniform(-jitter, jitter)
     dy = rng.uniform(-jitter, jitter)
-
-    shared = (
-        f'fill="none" stroke="{target.accent}" '
-        f'stroke-width="{stroke_width:.2f}" '
-        'stroke-linecap="round" stroke-linejoin="round" '
-        f'stroke-opacity="{opacity:.3f}" '
-        f'transform="translate({dx:.2f} {dy:.2f})"'
-    )
 
     shapes = {
         "猫": (
@@ -303,7 +367,152 @@ def _draw_target(
     }
 
     shape_markup = shapes[target.label]
-    return f"<g {shared}>{shape_markup}</g>"
+    glow_group = (
+        f'<g fill="{target.accent}" fill-opacity="{0.08 + clarity * 0.12:.3f}" '
+        f'stroke="{target.accent}" stroke-opacity="{0.14 + clarity * 0.18:.3f}" '
+        f'stroke-width="{stroke_width * 2.2:.2f}" '
+        'stroke-linecap="round" stroke-linejoin="round" '
+        f'transform="translate({dx:.2f} {dy:.2f})">{shape_markup}</g>'
+    )
+    fill_group = (
+        f'<g fill="{target.accent}" fill-opacity="{0.06 + clarity * 0.18:.3f}" '
+        'stroke="none" '
+        f'transform="translate({dx:.2f} {dy:.2f})">{shape_markup}</g>'
+    )
+    stroke_group = (
+        f'<g fill="none" stroke="{target.accent}" '
+        f'stroke-width="{stroke_width:.2f}" '
+        'stroke-linecap="round" stroke-linejoin="round" '
+        f'stroke-opacity="{opacity:.3f}" '
+        f'transform="translate({dx:.2f} {dy:.2f})">{shape_markup}</g>'
+    )
+
+    return glow_group + fill_group + stroke_group
+
+
+def _draw_scene(
+    target: TargetDefinition,
+    clarity: float,
+    variant: TrajectoryVariant,
+    progress: float,
+) -> str:
+    scene_opacity = 0.1 + clarity * 0.16
+    base_haze = (
+        '<g fill="#72d6c9" fill-opacity="0.04">'
+        '<circle cx="18" cy="14" r="10" />'
+        '<circle cx="50" cy="18" r="12" />'
+        "</g>"
+    )
+
+    scene_map = {
+        "猫": (
+            '<g fill="#effbf6" fill-opacity="{opacity}">'
+            '<circle cx="49" cy="14" r="6" />'
+            '<path d="M0 54L12 46L22 48L34 40L52 45L64 39V64H0Z" />'
+            "</g>"
+        ),
+        "狐狸": (
+            '<g fill="#ffb58a" fill-opacity="{opacity}">'
+            '<path d="M0 55L11 47L22 50L32 45L46 47L64 42V64H0Z" />'
+            '<circle cx="48" cy="12" r="5" />'
+            "</g>"
+        ),
+        "狼": (
+            '<g fill="#8fd3ff" fill-opacity="{opacity}">'
+            '<circle cx="46" cy="13" r="6" />'
+            '<path d="M0 56L16 46L28 48L43 42L64 48V64H0Z" />'
+            "</g>"
+        ),
+        "龙": (
+            '<g fill="#ff6b6b" fill-opacity="{opacity}">'
+            '<path d="M0 58L12 45L25 52L36 39L48 47L64 34V64H0Z" />'
+            '<circle cx="16" cy="18" r="4" />'
+            '<circle cx="22" cy="12" r="2" />'
+            "</g>"
+        ),
+        "潜艇": (
+            '<g fill="#56cfe1" fill-opacity="{opacity}">'
+            '<path d="M0 38C10 34 22 36 34 39C45 42 54 43 64 40V64H0Z" />'
+            '<path d="M0 48C12 45 22 47 34 50C46 53 55 54 64 51V64H0Z" />'
+            '<circle cx="14" cy="18" r="1.8" />'
+            '<circle cx="18" cy="12" r="1.2" />'
+            "</g>"
+        ),
+        "悬浮摩托": (
+            '<g fill="#ffd166" fill-opacity="{opacity}">'
+            '<path d="M0 58L18 44H46L64 34V64H0Z" />'
+            '<path d="M6 42H22M30 36H46M40 30H58" stroke="#ffd166" stroke-opacity="{line_opacity}" stroke-width="1.2" />'
+            "</g>"
+        ),
+        "机器人": (
+            '<g fill="#8ecae6" fill-opacity="{opacity}">'
+            '<rect x="8" y="11" width="10" height="14" rx="2" />'
+            '<rect x="45" y="14" width="12" height="16" rx="2" />'
+            '<path d="M0 58L15 47L28 51L44 43L64 45V64H0Z" />'
+            "</g>"
+        ),
+        "飞艇": (
+            '<g fill="#cdb4db" fill-opacity="{opacity}">'
+            '<ellipse cx="18" cy="18" rx="8" ry="4" />'
+            '<ellipse cx="48" cy="14" rx="10" ry="5" />'
+            '<path d="M0 58L10 55L18 56L30 52L44 55L64 49V64H0Z" />'
+            "</g>"
+        ),
+        "城堡": (
+            '<g fill="#bcb8b1" fill-opacity="{opacity}">'
+            '<circle cx="48" cy="13" r="6" />'
+            '<path d="M0 57L8 51H18L24 47H33L39 51H48L55 46H64V64H0Z" />'
+            "</g>"
+        ),
+    }
+
+    scene_markup = scene_map[target.label].format(
+        opacity=f"{scene_opacity:.3f}",
+        line_opacity=f"{0.12 + progress * 0.12:.3f}",
+    )
+
+    if variant.overlay_mode == "corrupted":
+        scene_markup += (
+            '<g fill="#ff7a7a" fill-opacity="0.06">'
+            '<polygon points="0 0 18 0 0 18" />'
+            '<polygon points="64 64 46 64 64 46" />'
+            "</g>"
+        )
+
+    return base_haze + scene_markup
+
+
+def _draw_foreground(
+    target: TargetDefinition,
+    clarity: float,
+    variant: TrajectoryVariant,
+) -> str:
+    shard_opacity = 0.06 + clarity * 0.08
+    fragments = [
+        '<g fill="#effbf6" fill-opacity="{opacity}">'
+        '<polygon points="0 8 12 0 18 0 6 14" />'
+        '<polygon points="64 12 52 0 46 0 58 18" />'
+        '<polygon points="0 56 8 48 15 52 4 64 0 64" />'
+        '<polygon points="64 52 58 46 50 49 59 64 64 64" />'
+        "</g>".format(opacity=f"{shard_opacity:.3f}")
+    ]
+
+    if target.family == "machine":
+        fragments.append(
+            '<g fill="none" stroke="#72d6c9" stroke-opacity="0.18" stroke-width="0.5">'
+            '<path d="M6 30H16M48 34H58M24 8V16M40 48V58" />'
+            "</g>"
+        )
+
+    if variant.overlay_mode == "pulse":
+        fragments.append(
+            '<g fill="#8fd3ff" fill-opacity="0.08">'
+            '<rect x="0" y="24" width="64" height="2" />'
+            '<rect x="0" y="38" width="64" height="2" />'
+            "</g>"
+        )
+
+    return "".join(fragments)
 
 
 def _region_bounds(region: str | None) -> tuple[int, int, int, int] | None:
@@ -327,4 +536,3 @@ def _point_in_region(
 
 def _clamp(value: float, minimum: float, maximum: float) -> float:
     return max(minimum, min(maximum, value))
-

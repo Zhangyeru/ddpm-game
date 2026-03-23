@@ -26,7 +26,10 @@ export function StatusBar({
         <p className="eyebrow">DDPM 网页游戏原型</p>
         <h1>噪声考古学家</h1>
         <p className="subtle-copy">
-          把一段去噪过程变成可观察、可干预、可抢答的一局游戏。
+          把去噪过程做成一场高风险的判断游戏。
+        </p>
+        <p className="mission-copy">
+          {session ? session.mission_title : "等待任务分配"}
         </p>
       </div>
 
@@ -40,13 +43,25 @@ export function StatusBar({
         <div className="stat-card">
           <span className="stat-label">时间</span>
           <strong className="stat-value">
-            {session ? `${session.time_remaining} 秒` : "--"}
+            {session ? `${session.seconds_remaining.toFixed(1)} 秒` : "--"}
           </strong>
         </div>
         <div className="stat-card">
           <span className="stat-label">分数</span>
           <strong className="stat-value">
             {session ? session.score : "--"}
+          </strong>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">稳定度</span>
+          <strong className="stat-value">
+            {session ? session.stability : "--"}
+          </strong>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">污染度</span>
+          <strong className="stat-value">
+            {session ? session.corruption : "--"}
           </strong>
         </div>
         <div className="stat-card">

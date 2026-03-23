@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from urllib.parse import unquote
+
+
+SVG_DATA_URI_PREFIX = "data:image/svg+xml;utf8,"
 
 
 class TrajectoryStore:
@@ -19,6 +23,10 @@ class TrajectoryStore:
             label: target_payload["variants"]
             for label, target_payload in data["targets"].items()
         }
+        self.target_labels = tuple(self.targets.keys())
+
+    def has_target(self, target_label: str) -> bool:
+        return target_label in self.targets
 
     def get_frame(self, target_label: str, variant_key: str, frame_index: int) -> str:
         variants = self.targets[target_label]
@@ -26,3 +34,8 @@ class TrajectoryStore:
         clamped_index = max(0, min(frame_index, len(frames) - 1))
         return frames[clamped_index]
 
+    def get_frame_svg(self, target_label: str, variant_key: str, frame_index: int) -> str:
+        frame = self.get_frame(target_label, variant_key, frame_index)
+        if frame.startswith(SVG_DATA_URI_PREFIX):
+            return unquote(frame.removeprefix(SVG_DATA_URI_PREFIX))
+        return frame

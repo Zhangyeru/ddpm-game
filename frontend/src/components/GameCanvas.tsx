@@ -1,4 +1,5 @@
 import type { SessionSnapshot } from "../game/types";
+import { resolveApiUrl } from "../services/api";
 
 type GameCanvasProps = {
   session: SessionSnapshot | null;
@@ -7,6 +8,12 @@ type GameCanvasProps = {
 export function GameCanvas({ session }: GameCanvasProps) {
   const progressPercent = session
     ? Math.round(session.progress * 100)
+    : 0;
+  const stabilityPercent = session
+    ? Math.max(0, Math.min(100, session.stability))
+    : 0;
+  const corruptionPercent = session
+    ? Math.max(0, Math.min(100, session.corruption))
     : 0;
 
   return (
@@ -17,9 +24,12 @@ export function GameCanvas({ session }: GameCanvasProps) {
           <h2>主画布</h2>
         </div>
         {session ? (
-          <p className="canvas-meta">
-            帧 {session.frame_index + 1}/{session.total_frames}
-          </p>
+          <div className="canvas-meta-group">
+            <p className="canvas-meta">
+              帧 {session.frame_index + 1}/{session.total_frames}
+            </p>
+            <p className="canvas-meta">{session.phase_label}</p>
+          </div>
         ) : null}
       </div>
 
@@ -28,7 +38,7 @@ export function GameCanvas({ session }: GameCanvasProps) {
           <>
             <img
               className="screen-image"
-              src={session.image_data}
+              src={resolveApiUrl(session.image_url)}
               alt="去噪过程画面"
             />
             <div className="screen-overlay" />
@@ -48,21 +58,56 @@ export function GameCanvas({ session }: GameCanvasProps) {
         />
       </div>
 
+      <div className="meter-stack">
+        <div className="meter-card">
+          <div className="meter-label-row">
+            <span className="readout-label">稳定度</span>
+            <strong>{session ? session.stability : "--"}</strong>
+          </div>
+          <div className="meter-bar">
+            <div
+              className="meter-fill meter-fill--stability"
+              style={{ width: `${stabilityPercent}%` }}
+            />
+          </div>
+        </div>
+        <div className="meter-card">
+          <div className="meter-label-row">
+            <span className="readout-label">污染度</span>
+            <strong>{session ? session.threat_label : "--"}</strong>
+          </div>
+          <div className="meter-bar">
+            <div
+              className="meter-fill meter-fill--corruption"
+              style={{ width: `${corruptionPercent}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="canvas-readout">
         <div>
           <span className="readout-label">提示谱带</span>
           <strong>{session?.hint ?? "等待锁定目标。"}</strong>
         </div>
         <div>
-          <span className="readout-label">剩余猜测</span>
+          <span className="readout-label">风险等级</span>
           <strong>
-            {session ? session.remaining_guesses : "--"}
+            {session ? session.threat_label : "--"}
           </strong>
         </div>
         <div>
-          <span className="readout-label">剩余卡牌</span>
+          <span className="readout-label">特征线索</span>
           <strong>
-            {session ? session.cards_remaining : "--"}
+            {session?.signature_clue ?? "尚未进行脉冲扫描"}
+          </strong>
+        </div>
+        <div>
+          <span className="readout-label">资源摘要</span>
+          <strong>
+            {session
+              ? `剩余 ${session.frames_remaining} 帧 / 猜测 ${session.remaining_guesses} / 卡牌 ${session.cards_remaining} / 脉冲 ${session.scan_charges}`
+              : "--"}
           </strong>
         </div>
       </div>

@@ -2,6 +2,7 @@ type GuessPanelProps = {
   labels: string[];
   selectedGuess: string | null;
   disabled: boolean;
+  missionTitle: string;
   onSelect: (label: string) => void;
   onConfirm: () => void;
 };
@@ -10,6 +11,7 @@ export function GuessPanel({
   labels,
   selectedGuess,
   disabled,
+  missionTitle,
   onSelect,
   onConfirm
 }: GuessPanelProps) {
@@ -40,7 +42,7 @@ export function GuessPanel({
 
       <div className="guess-footer">
         <p>
-          越早提交分数越高，但轮廓更模糊；越晚更稳，但奖励更低。
+          当前候选 {labels.length} 项。{missionTitle}
         </p>
         <button
           className="action-button"
