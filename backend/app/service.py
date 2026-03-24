@@ -155,12 +155,22 @@ class GameService:
             session = self._get_session(player_id, session_id)
             if session.status != "won":
                 raise ValueError("只有通关后的回收记录才能推进下一关。")
+            progress = self._campaign_progress(session.player_id)
+            if session.next_level_id is not None and progress.current_level_id != session.level_id:
+                current_definition = level_by_id(progress.current_level_id)
+                current_session = self._build_session(
+                    session.player_id,
+                    progress,
+                    current_definition,
+                )
+                self.sessions[current_session.session_id] = current_session
+                return self._snapshot(current_session)
             if session.awaiting_advancement is False or session.next_level_id is None:
                 raise ValueError("当前没有可推进的下一关。")
 
-            progress = self._campaign_progress(session.player_id)
             progress.current_level_id = session.next_level_id
             self._save_campaign_progress(session.player_id, progress)
+            session.awaiting_advancement = False
             next_definition = level_by_id(session.next_level_id)
             next_session = self._build_session(session.player_id, progress, next_definition)
             self.sessions[next_session.session_id] = next_session

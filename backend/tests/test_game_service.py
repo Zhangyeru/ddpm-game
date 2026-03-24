@@ -154,6 +154,31 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(progression.highest_unlocked_level_id, "chapter-1-level-2")
         self.assertIn("chapter-1-level-1", progression.completed_level_ids)
 
+    def test_advance_from_stale_session_keeps_latest_progress(self) -> None:
+        primary_snapshot = self.service.start_current_level("player-a")
+        stale_snapshot = self.service.start_current_level("player-a")
+
+        primary_target = self.service.sessions[primary_snapshot.session_id].target.label
+        stale_target = self.service.sessions[stale_snapshot.session_id].target.label
+
+        primary_win = self.service.guess("player-a", primary_snapshot.session_id, primary_target)
+        level_two_session = self.service.advance("player-a", primary_win.session_id)
+        level_two_target = self.service.sessions[level_two_session.session_id].target.label
+        level_two_win = self.service.guess(
+            "player-a",
+            level_two_session.session_id,
+            level_two_target,
+        )
+        self.service.advance("player-a", level_two_win.session_id)
+
+        stale_win = self.service.guess("player-a", stale_snapshot.session_id, stale_target)
+        stale_advance = self.service.advance("player-a", stale_win.session_id)
+        progression = self.service.get_progression("player-a")
+
+        self.assertEqual(progression.current_level_id, "chapter-1-level-3")
+        self.assertEqual(stale_advance.level_id, "chapter-1-level-3")
+        self.assertEqual(stale_advance.status, "playing")
+
     def test_loss_does_not_advance_level(self) -> None:
         snapshot = self.service.start_session("player-a")
         session = self.service.sessions[snapshot.session_id]

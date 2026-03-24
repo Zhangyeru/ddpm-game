@@ -10,8 +10,17 @@ from .frame_renderer import DEFAULT_MODEL_ID, DEFAULT_TOTAL_FRAMES, TrajectoryVa
 from .game_data import TargetDefinition
 
 
+DEFAULT_PHOTO_PROMPT_SEGMENTS = (
+    "real-world documentary photograph",
+    "natural lighting",
+    "real camera optics",
+    "realistic texture and material detail",
+    "unedited photo",
+)
 DEFAULT_NEGATIVE_PROMPT = (
-    "low quality, blurry, distorted, abstract, illustration, painting, extra limbs, mutated"
+    "low quality, blurry, distorted, abstract, illustration, painting, drawing, sketch, "
+    "cartoon, anime, CGI, 3d render, synthetic image, stylized, concept art, game asset, "
+    "plastic texture, oversaturated, extra limbs, mutated"
 )
 WRONG_FAMILY_SUBJECTS: dict[str, str] = {
     "living": "vehicle or machine",
@@ -107,7 +116,7 @@ def resolve_variant_plan(
     if variant.wrong_family:
         subject = WRONG_FAMILY_SUBJECTS[target.family]
 
-    prompt_segments = [f"a high quality photo of {subject}"]
+    prompt_segments = [f"a high quality photo of {subject}", *DEFAULT_PHOTO_PROMPT_SEGMENTS]
     if variant.prompt_suffix:
         prompt_segments.append(variant.prompt_suffix)
 

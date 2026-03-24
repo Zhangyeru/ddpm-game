@@ -13,6 +13,7 @@ import {
   saveFinishedSessionHistory
 } from "./scoreHistory";
 import {
+  ApiError,
   advanceLevel,
   getCurrentUser,
   getLeaderboard,
@@ -116,6 +117,7 @@ export function useGameSession(options?: { autoStepEnabled?: boolean }) {
     setProgressionLoading(true);
 
     const token = readAuthToken();
+    let bootstrapUser = readAuthUser();
     if (token) {
       try {
         const authSession = await getCurrentUser();
@@ -131,12 +133,16 @@ export function useGameSession(options?: { autoStepEnabled?: boolean }) {
         setHistory(readScoreHistory(nextHistoryOwner));
         setProgressionLoading(false);
         return;
-      } catch {
-        clearAuthSession();
+      } catch (requestError) {
         if (!mountedRef.current || requestId !== progressionSequenceRef.current) {
           return;
         }
-        setAuthUser(null);
+
+        if (requestError instanceof ApiError && requestError.status === 401) {
+          clearAuthSession();
+          bootstrapUser = null;
+          setAuthUser(null);
+        }
       }
     }
 
@@ -145,7 +151,7 @@ export function useGameSession(options?: { autoStepEnabled?: boolean }) {
       if (!mountedRef.current || requestId !== progressionSequenceRef.current) {
         return;
       }
-      const nextHistoryOwner = historyOwnerKey(null, playerIdRef.current);
+      const nextHistoryOwner = historyOwnerKey(bootstrapUser, playerIdRef.current);
       setHistoryOwner(nextHistoryOwner);
       setHistory(readScoreHistory(nextHistoryOwner));
       setProgression(next);
