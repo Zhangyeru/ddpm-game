@@ -16,6 +16,7 @@ from .schemas import (
     AuthSessionSnapshot,
     AuthUser,
     GuessRequest,
+    LeaderboardEntry,
     LoginRequest,
     ProgressSnapshot,
     RegisterRequest,
@@ -122,6 +123,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             user=auth_user_model(user.id, user.username),
             progression=progression,
         )
+
+    @app.get("/api/leaderboard", response_model=list[LeaderboardEntry])
+    def leaderboard() -> list[LeaderboardEntry]:
+        records = auth_store.list_leaderboard()
+        return [
+            LeaderboardEntry(
+                rank=record.rank,
+                user_id=record.user_id,
+                username=record.username,
+                campaign_total_score=record.campaign_total_score,
+                completed_count=record.completed_count,
+                campaign_complete=record.campaign_complete,
+            )
+            for record in records
+        ]
 
     @app.post("/api/session/start", response_model=SessionSnapshot)
     def start_session(

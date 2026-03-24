@@ -1,5 +1,11 @@
-import type { AuthUser, PendingActionKind, ProgressSnapshot } from "../game/types";
+import type {
+  AuthUser,
+  PendingActionKind,
+  ProgressSnapshot
+} from "../game/types";
 import { AuthPanel } from "./AuthPanel";
+import { formatLevelCode } from "../game/levelPresentation";
+import { formatSignedScore } from "../game/scorePresentation";
 import {
   CARD_TOOL_GUIDE,
   MISSION_GUIDES,
@@ -38,6 +44,7 @@ type LandingGuideProps = {
   onLogin: (username: string, password: string) => Promise<void>;
   onLogout: () => Promise<void>;
   onRegister: (username: string, password: string) => Promise<void>;
+  onOpenLeaderboard: () => void;
   progression: ProgressSnapshot | null;
   onStart: () => void;
 };
@@ -51,6 +58,7 @@ export function LandingGuide({
   onLogin,
   onLogout,
   onRegister,
+  onOpenLeaderboard,
   progression,
   onStart
 }: LandingGuideProps) {
@@ -70,7 +78,7 @@ export function LandingGuide({
           <p className="eyebrow">线性闯关</p>
           <h2>
             {currentLevel
-              ? `${currentLevel.chapter_title} · 第 ${currentLevel.level} 关`
+              ? `${currentLevel.chapter_title} · ${formatLevelCode(currentLevel.chapter, currentLevel.level)}`
               : "观察图像，用对卡牌，在窗口关闭前完成识别"}
           </h2>
           <p>
@@ -83,6 +91,11 @@ export function LandingGuide({
               {progression
                 ? `已完成 ${progression.completed_count}/${progression.total_levels}`
                 : "12 关线性推进"}
+            </span>
+            <span className="hero-pill">
+              {progression
+                ? `闯关总分 ${formatSignedScore(progression.campaign_total_score)}`
+                : "按各关最佳分累计总分"}
             </span>
             <span className="hero-pill">
               {currentLevel ? `${currentLevel.candidate_count} 项候选` : "候选数量逐关提升"}
@@ -115,6 +128,11 @@ export function LandingGuide({
               type="button"
             >
               {actionLabel}
+            </button>
+          </div>
+          <div className="landing-secondary-actions">
+            <button className="secondary-button" onClick={onOpenLeaderboard} type="button">
+              查看总分排行榜
             </button>
           </div>
         </section>
@@ -262,8 +280,13 @@ export function LandingGuide({
                     level.is_current ? "level-progress-card--current" : ""
                   } ${level.is_completed ? "level-progress-card--completed" : ""}`}
                 >
-                  <strong>{`第 ${level.chapter}-${level.level} 关`}</strong>
+                  <strong>{formatLevelCode(level.chapter, level.level)}</strong>
                   <p>{level.level_title}</p>
+                  {level.best_score !== null ? (
+                    <span className="level-progress-score">
+                      {`最佳分 ${formatSignedScore(level.best_score)}`}
+                    </span>
+                  ) : null}
                   <span>
                     {level.is_current
                       ? "当前关"

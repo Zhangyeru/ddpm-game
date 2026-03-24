@@ -1,4 +1,5 @@
 import { describeMissionFocus } from "../content/gameGuide";
+import { formatLevelCode } from "../game/levelPresentation";
 import { ScoreBreakdownGrid } from "./ScoreBreakdownGrid";
 import { ScoreEventList } from "./ScoreEventList";
 import {
@@ -43,20 +44,32 @@ export function ScorePanel({
             <h2>{session.level_title}</h2>
             <div className="result-meta-row">
               <span className="result-meta-chip">{session.chapter_title}</span>
-              <span className="result-meta-chip">{`第 ${session.chapter}-${session.level} 关`}</span>
+              <span className="result-meta-chip">{formatLevelCode(session.chapter, session.level)}</span>
             </div>
           </div>
           <span className="tool-counter">{session.threat_label}</span>
         </div>
 
-        <div className="live-score-card">
-          <span className="readout-label">当前分数</span>
-          <strong className="live-score-value">{formatSignedScore(session.score)}</strong>
-          <span className="live-score-meta">
-            {progression
-              ? `已完成 ${progression.completed_count}/${progression.total_levels}`
-              : "当前关进行中"}
-          </span>
+        <div className="live-score-strip">
+          <div className="live-score-card">
+            <span className="readout-label">当前分数</span>
+            <strong className="live-score-value">{formatSignedScore(session.score)}</strong>
+            <span className="live-score-meta">本关内实时累计</span>
+          </div>
+
+          <article className="result-card live-total-card">
+            <span className="readout-label">累计分数</span>
+            <strong className="live-total-value">
+              {progression
+                ? formatSignedScore(progression.campaign_total_score)
+                : formatSignedScore(session.score)}
+            </strong>
+            <p>
+              {progression
+                ? `已完成 ${progression.completed_count}/${progression.total_levels} 关`
+                : "当前账号 / 本地闯关总分"}
+            </p>
+          </article>
         </div>
 
         <div className="live-risk-grid">
@@ -112,7 +125,7 @@ export function ScorePanel({
           </div>
           <div className="result-meta-row">
             <span className="result-meta-chip">{session.chapter_title}</span>
-            <span className="result-meta-chip">{`第 ${session.chapter}-${session.level} 关`}</span>
+            <span className="result-meta-chip">{formatLevelCode(session.chapter, session.level)}</span>
           </div>
         </div>
         <div className="score-total-block">
@@ -188,6 +201,30 @@ export function ScorePanel({
           </div>
         </section>
       ) : null}
+
+      <section className="result-section">
+        <div className="result-section__header">
+          <p className="eyebrow">闯关总分</p>
+          <strong>
+            {progression
+              ? formatSignedScore(progression.campaign_total_score)
+              : formatSignedScore(session.score)}
+          </strong>
+        </div>
+        <div className="result-card result-card--summary">
+          <span className="readout-label">本关最佳</span>
+          <strong>
+            {session.level_best_score !== null
+              ? formatSignedScore(session.level_best_score)
+              : "尚未记录"}
+          </strong>
+          <p>
+            {session.level_best_improved
+              ? "这局刷新了当前关卡的最佳分。"
+              : "这局没有超过当前关卡的历史最佳。"}
+          </p>
+        </div>
+      </section>
 
       <section className="result-section">
         <div className="result-section__header">

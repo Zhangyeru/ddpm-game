@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import type { AuthUser, PendingActionKind, ProgressSnapshot } from "../game/types";
+import { formatLevelCode } from "../game/levelPresentation";
+import { formatSignedScore } from "../game/scorePresentation";
 
 type AuthPanelProps = {
   authBusyAction: Extract<PendingActionKind, "login" | "logout" | "register"> | null;
@@ -44,7 +46,7 @@ export function AuthPanel({
       return "登录后保存进度，未登录时仍可直接试玩。";
     }
 
-    return `当前进度：第 ${currentLevel.chapter}-${currentLevel.level} 关 ${currentLevel.level_title}`;
+    return `当前进度：${formatLevelCode(currentLevel.chapter, currentLevel.level)} ${currentLevel.level_title}`;
   }, [currentLevel]);
 
   function switchMode(nextMode: AuthMode) {
@@ -115,7 +117,7 @@ export function AuthPanel({
           <p>{panelSummary}</p>
           <span>
             {progression
-              ? `已完成 ${progression.completed_count}/${progression.total_levels} 关`
+              ? `已完成 ${progression.completed_count}/${progression.total_levels} 关 · 总分 ${formatSignedScore(progression.campaign_total_score)}`
               : "账号进度已保存到当前设备上的服务端数据库。"}
           </span>
         </div>

@@ -93,6 +93,8 @@ class Session:
     next_level_title: str | None = None
     next_level_summary: str | None = None
     campaign_complete: bool = False
+    level_best_score: int | None = None
+    level_best_improved: bool = False
     last_touched_at: float = field(default_factory=time.monotonic)
 
 
@@ -396,6 +398,7 @@ class GameService:
             remaining_guesses=level_definition.max_guesses,
             cards_remaining=level_definition.max_cards,
             hint=target.hint,
+            level_best_score=progress.best_scores_by_level.get(level_definition.level_id),
             events=[
                 f"{level_definition.chapter_title} · 第 {level_definition.level} 关：{level_definition.level_title}。",
                 level_definition.summary,
@@ -408,6 +411,7 @@ class GameService:
     def _complete_level(self, session: Session) -> None:
         progress = self._campaign_progress(session.player_id)
         progress.completed_level_ids.add(session.level_id)
+        self._update_level_best_score(progress, session)
         current_level = level_by_id(session.level_id)
         upcoming = resolve_next_level(session.level_id)
         if upcoming is None:
@@ -514,6 +518,9 @@ class GameService:
         session.score_breakdown = self._score_breakdown_model(
             calculate_loss_breakdown(process_score_total=session.score)
         )
+        progress = self._campaign_progress(session.player_id)
+        self._update_level_best_score(progress, session)
+        self._save_campaign_progress(session.player_id, progress)
         session.ended_at = self._ended_at_iso()
         session.revealed_target = session.target.label
         session.awaiting_advancement = False
@@ -552,6 +559,8 @@ class GameService:
             completed_count=len(progress.completed_level_ids),
             total_levels=len(self.levels),
             campaign_complete=progress.campaign_complete,
+            campaign_total_score=self._campaign_total_score(progress),
+            best_scores_by_level=dict(progress.best_scores_by_level),
             current_level=current_item,
             levels=items,
         )
@@ -574,6 +583,7 @@ class GameService:
             max_guesses=level_definition.max_guesses,
             max_cards=level_definition.max_cards,
             candidate_count=level_definition.candidate_count,
+            best_score=progress.best_scores_by_level.get(level_definition.level_id),
             is_current=level_definition.level_id == progress.current_level_id,
             is_completed=level_definition.level_id in progress.completed_level_ids,
             is_unlocked=level_index <= highest_index,
@@ -627,7 +637,23 @@ class GameService:
             next_level_title=session.next_level_title,
             next_level_summary=session.next_level_summary,
             campaign_complete=session.campaign_complete,
+            level_best_score=session.level_best_score,
+            level_best_improved=session.level_best_improved,
         )
+
+    def _campaign_total_score(self, progress: PlayerCampaignProgress) -> int:
+        return sum(progress.best_scores_by_level.values())
+
+    def _update_level_best_score(
+        self,
+        progress: PlayerCampaignProgress,
+        session: Session,
+    ) -> None:
+        previous_best = progress.best_scores_by_level.get(session.level_id)
+        session.level_best_improved = previous_best is None or session.score > previous_best
+        if session.level_best_improved:
+            progress.best_scores_by_level[session.level_id] = session.score
+        session.level_best_score = progress.best_scores_by_level.get(session.level_id, session.score)
 
     def _score_breakdown_model(self, breakdown: ScoreBreakdownData) -> ScoreBreakdown:
         return ScoreBreakdown(

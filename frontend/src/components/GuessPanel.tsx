@@ -5,9 +5,9 @@ type GuessPanelProps = {
   labels: string[];
   selectedGuess: string | null;
   disabled: boolean;
+  guessReminder: string | null;
   missionTitle: string;
-  onSelect: (label: string) => void;
-  onConfirm: () => void;
+  onGuess: (label: string) => void;
 };
 
 export function GuessPanel({
@@ -15,9 +15,9 @@ export function GuessPanel({
   labels,
   selectedGuess,
   disabled,
+  guessReminder,
   missionTitle,
-  onSelect,
-  onConfirm
+  onGuess
 }: GuessPanelProps) {
   return (
     <section className="panel guess-panel">
@@ -27,12 +27,14 @@ export function GuessPanel({
           <h2>猜测台</h2>
         </div>
         <span className="tool-counter">
-          {selectedGuess ?? "先选择一个目标"}
+          {busyAction === "guess" && selectedGuess
+            ? `提交中：${selectedGuess}`
+            : "点击目标即提交"}
         </span>
       </div>
 
       <p className="guess-intro">
-        当前候选 {labels.length} 项。{missionTitle}
+        当前候选 {labels.length} 项。{missionTitle} 点击任一候选后会直接作为本次猜测提交。
       </p>
 
       <div className="guess-grid">
@@ -43,32 +45,20 @@ export function GuessPanel({
               selectedGuess === label ? "guess-chip--active" : ""
             }`}
             disabled={disabled}
-            onClick={() => onSelect(label)}
+            onClick={() => onGuess(label)}
             type="button"
           >
-            {label}
+            {busyAction === "guess" && selectedGuess === label ? "提交中..." : label}
           </button>
         ))}
       </div>
 
-      <div className="guess-footer">
-        <div className="guess-selection-card">
-          <span className="readout-label">当前选择</span>
-          <strong>{selectedGuess ?? "尚未选择"}</strong>
+      {guessReminder ? (
+        <div className="guess-warning" role="alert">
+          <strong>选择错误</strong>
+          <span>{guessReminder}</span>
         </div>
-        <button
-          className="action-button guess-confirm"
-          disabled={disabled || !selectedGuess}
-          onClick={onConfirm}
-          type="button"
-        >
-          {busyAction === "guess"
-            ? "提交中..."
-            : selectedGuess
-              ? `确认：${selectedGuess}`
-              : "先选择目标"}
-        </button>
-      </div>
+      ) : null}
     </section>
   );
 }

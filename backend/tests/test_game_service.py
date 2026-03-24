@@ -68,6 +68,8 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(progression.current_level_id, "chapter-1-level-1")
         self.assertEqual(progression.highest_unlocked_level_id, "chapter-1-level-1")
         self.assertEqual(progression.completed_count, 0)
+        self.assertEqual(progression.campaign_total_score, 0)
+        self.assertEqual(progression.best_scores_by_level, {})
         self.assertFalse(progression.campaign_complete)
         self.assertTrue(progression.current_level.is_current)
 
@@ -133,6 +135,8 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(result.score_events[-1].kind, "settlement")
         self.assertEqual(result.score_events[-1].delta, expected_breakdown.settlement_score)
         self.assertTrue(result.awaiting_advancement)
+        self.assertTrue(result.level_best_improved)
+        self.assertEqual(result.level_best_score, expected_breakdown.final_score)
         self.assertEqual(result.next_level_id, "chapter-1-level-2")
         self.assertIsNotNone(result.ended_at)
 
@@ -281,6 +285,7 @@ class GameServiceTest(unittest.TestCase):
                 "chapter-1-level-2",
             )
             self.assertIn("chapter-1-level-1", persisted_progress.completed_level_ids)
+            self.assertIn("chapter-1-level-1", persisted_progress.best_scores_by_level)
 
             next_service = GameService(
                 trajectory_store=self.trajectory_store,
@@ -289,6 +294,31 @@ class GameServiceTest(unittest.TestCase):
             )
             progression = next_service.get_progression(actor_id)
             self.assertEqual(progression.current_level_id, "chapter-1-level-2")
+            self.assertGreater(progression.campaign_total_score, 0)
+
+    def test_lower_score_does_not_replace_existing_level_best(self) -> None:
+        first_snapshot = self.service.start_current_level("player-a")
+        first_session = self.service.sessions[first_snapshot.session_id]
+        first_result = self.service.guess("player-a", first_snapshot.session_id, first_session.target.label)
+        first_best = first_result.level_best_score
+
+        progress = self.service._campaign_progress("player-a")
+        progress.current_level_id = "chapter-1-level-1"
+        self.service._save_campaign_progress("player-a", progress)
+
+        retry_snapshot = self.service.start_current_level("player-a")
+        retry_session = self.service.sessions[retry_snapshot.session_id]
+        self.service.use_card("player-a", retry_snapshot.session_id, "sharpen-outline")
+        wrong_label = next(
+            label for label in retry_snapshot.candidate_labels if label != retry_session.target.label
+        )
+        self.service.guess("player-a", retry_snapshot.session_id, wrong_label)
+        retry_result = self.service.guess("player-a", retry_snapshot.session_id, retry_session.target.label)
+        progression = self.service.get_progression("player-a")
+
+        self.assertFalse(retry_result.level_best_improved)
+        self.assertEqual(retry_result.level_best_score, first_best)
+        self.assertEqual(progression.best_scores_by_level["chapter-1-level-1"], first_best)
 
 
 class TrajectoryStoreTest(unittest.TestCase):

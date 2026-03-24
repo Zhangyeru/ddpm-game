@@ -45,6 +45,7 @@ def test_progression_and_advance_endpoints_work() -> None:
         progression_response = client.get("/api/progression", headers=headers)
         assert progression_response.status_code == 200
         assert progression_response.json()["current_level_id"] == "chapter-1-level-1"
+        assert progression_response.json()["campaign_total_score"] == 0
 
         start_response = client.post("/api/session/start-current-level", headers=headers)
         assert start_response.status_code == 200
@@ -65,3 +66,40 @@ def test_progression_and_advance_endpoints_work() -> None:
         )
         assert advance_response.status_code == 200
         assert advance_response.json()["level_id"] == "chapter-1-level-2"
+
+        refreshed_progression = client.get("/api/progression", headers=headers)
+        assert refreshed_progression.status_code == 200
+        assert refreshed_progression.json()["campaign_total_score"] > 0
+
+
+def test_leaderboard_endpoint_returns_ranked_users() -> None:
+    with TemporaryDirectory() as temp_dir:
+        client, service = make_test_client(temp_dir)
+
+        alpha = client.post(
+            "/api/auth/register",
+            json={"username": "alpha", "password": "password123"},
+        )
+        bravo = client.post(
+            "/api/auth/register",
+            json={"username": "bravo", "password": "password123"},
+        )
+        alpha_headers = {"Authorization": f"Bearer {alpha.json()['access_token']}"}
+        bravo_headers = {"Authorization": f"Bearer {bravo.json()['access_token']}"}
+
+        alpha_session = client.post("/api/session/start-current-level", headers=alpha_headers).json()
+        alpha_target = service.sessions[alpha_session["session_id"]].target.label
+        client.post(
+            f"/api/session/{alpha_session['session_id']}/guess",
+            headers=alpha_headers,
+            json={"label": alpha_target},
+        )
+
+        leaderboard_response = client.get("/api/leaderboard")
+
+        assert leaderboard_response.status_code == 200
+        payload = leaderboard_response.json()
+        assert payload[0]["rank"] == 1
+        assert payload[0]["username"] == "alpha"
+        assert payload[0]["campaign_total_score"] > 0
+        assert payload[1]["username"] == "bravo"

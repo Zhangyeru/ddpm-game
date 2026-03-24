@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Drawer } from "./Drawer";
 import { EmptyState } from "./EmptyState";
+import { formatLevelCode } from "../game/levelPresentation";
 import { ScoreBreakdownGrid } from "./ScoreBreakdownGrid";
 import { ScoreEventList } from "./ScoreEventList";
 import {
@@ -162,7 +163,7 @@ export function HistoryDrawer({
                     {entry.revealed_target ?? "未知目标"}
                   </strong>
                   <span>
-                    {`${entry.chapter && entry.level ? `第 ${entry.chapter}-${entry.level} 关 ` : ""}${entry.level_title || "未知关卡"} · ${entry.mission_title} · ${formatEndedAt(entry.ended_at)}`}
+                    {`${entry.chapter && entry.level ? `${formatLevelCode(entry.chapter, entry.level)} ` : ""}${entry.level_title || "未知关卡"} · ${entry.mission_title} · ${formatEndedAt(entry.ended_at)}`}
                   </span>
                 </div>
                 <span

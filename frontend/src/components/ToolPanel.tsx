@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CardId, SessionSnapshot } from "../game/types";
 import type { PendingActionKind } from "../game/types";
 import { CARD_TOOL_GUIDE } from "../content/gameGuide";
@@ -27,8 +28,20 @@ export function ToolPanel({
   disabled,
   onUseCard
 }: ToolPanelProps) {
+  const [expandedCards, setExpandedCards] = useState<Record<CardId, boolean>>({
+    "sharpen-outline": false,
+    "mechanical-lens": false,
+    "bio-scan": false
+  });
   const cardsRemaining = session?.cards_remaining ?? 0;
   const maxCards = session?.max_cards ?? 0;
+
+  function toggleCard(cardId: CardId) {
+    setExpandedCards((current) => ({
+      ...current,
+      [cardId]: !current[cardId]
+    }));
+  }
 
   return (
     <section className="panel side-panel">
@@ -49,6 +62,7 @@ export function ToolPanel({
       <div className="tool-grid">
         {CARD_ORDER.map((cardId) => {
           const guide = CARD_TOOL_GUIDE[cardId];
+          const expanded = expandedCards[cardId];
           const used = session?.used_cards.includes(cardId) ?? false;
           const blocked =
             disabled ||
@@ -60,7 +74,9 @@ export function ToolPanel({
           return (
             <article
               key={cardId}
-              className={`tool-card ${used ? "tool-card--used" : ""}`}
+              className={`tool-card ${used ? "tool-card--used" : ""} ${
+                expanded ? "tool-card--expanded" : ""
+              }`}
             >
               <div className="tool-card__header">
                 <strong>{guide.title}</strong>
@@ -68,32 +84,45 @@ export function ToolPanel({
                   {used ? "已使用" : CARD_FAMILY_LABEL[cardId]}
                 </span>
               </div>
-              <div className="tool-card__body">
-                <span className="tool-card__line">
-                  <strong>效果</strong>
-                  {guide.effect}
-                </span>
-                <span className="tool-card__line">
-                  <strong>代价</strong>
-                  {guide.cost}
-                </span>
-                <span className="tool-card__line">
-                  <strong>适合</strong>
-                  {guide.timing}
-                </span>
+
+              <div className="tool-card__footer">
+                <button
+                  className="tool-card__toggle"
+                  onClick={() => toggleCard(cardId)}
+                  type="button"
+                >
+                  {expanded ? "收起详情" : "查看功能"}
+                </button>
+                <button
+                  className="tool-card__action"
+                  disabled={blocked}
+                  onClick={() => onUseCard(cardId)}
+                  type="button"
+                >
+                  {used
+                    ? "本局已用"
+                    : busyAction === "card"
+                      ? "应用中..."
+                      : "立即使用"}
+                </button>
               </div>
-              <button
-                className="tool-card__action"
-                disabled={blocked}
-                onClick={() => onUseCard(cardId)}
-                type="button"
-              >
-                {used
-                  ? "本局已用"
-                  : busyAction === "card"
-                    ? "应用中..."
-                    : "立即使用"}
-              </button>
+
+              {expanded ? (
+                <div className="tool-card__body">
+                  <span className="tool-card__line">
+                    <strong>效果</strong>
+                    {guide.effect}
+                  </span>
+                  <span className="tool-card__line">
+                    <strong>代价</strong>
+                    {guide.cost}
+                  </span>
+                  <span className="tool-card__line">
+                    <strong>适合</strong>
+                    {guide.timing}
+                  </span>
+                </div>
+              ) : null}
             </article>
           );
         })}

@@ -66,6 +66,7 @@ class LevelProgressItem(BaseModel):
     max_guesses: int
     max_cards: int
     candidate_count: int
+    best_score: int | None
     is_current: bool
     is_completed: bool
     is_unlocked: bool
@@ -78,6 +79,8 @@ class ProgressSnapshot(BaseModel):
     completed_count: int
     total_levels: int
     campaign_complete: bool
+    campaign_total_score: int
+    best_scores_by_level: dict[str, int]
     current_level: LevelProgressItem
     levels: list[LevelProgressItem]
 
@@ -85,6 +88,15 @@ class ProgressSnapshot(BaseModel):
 class AuthUser(BaseModel):
     id: str
     username: str
+
+
+class LeaderboardEntry(BaseModel):
+    rank: int
+    user_id: str
+    username: str
+    campaign_total_score: int
+    completed_count: int
+    campaign_complete: bool
 
 
 class AuthResponse(BaseModel):
@@ -141,3 +153,5 @@ class SessionSnapshot(BaseModel):
     next_level_title: str | None
     next_level_summary: str | None
     campaign_complete: bool
+    level_best_score: int | None
+    level_best_improved: bool

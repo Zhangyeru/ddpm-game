@@ -2,6 +2,7 @@ import type {
   AuthResponse,
   AuthSessionSnapshot,
   CardId,
+  LeaderboardEntry,
   ProgressSnapshot,
   SessionSnapshot
 } from "../game/types";
@@ -85,6 +86,10 @@ export function loginUser(
 
 export function getCurrentUser(): Promise<AuthSessionSnapshot> {
   return request<AuthSessionSnapshot>("/auth/me");
+}
+
+export function getLeaderboard(): Promise<LeaderboardEntry[]> {
+  return request<LeaderboardEntry[]>("/leaderboard");
 }
 
 export function startSession(): Promise<SessionSnapshot> {

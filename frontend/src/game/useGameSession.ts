@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   AuthUser,
   CardId,
+  LeaderboardEntry,
   PendingActionKind,
   ProgressSnapshot,
   ScoreHistoryEntry,
@@ -14,6 +15,7 @@ import {
 import {
   advanceLevel,
   getCurrentUser,
+  getLeaderboard,
   getPlayerId,
   getProgression,
   loginUser,
@@ -42,6 +44,7 @@ type SessionErrorState = {
 type SessionRequestDescriptor = {
   kind: PendingActionKind;
   requestFactory: () => Promise<SessionSnapshot>;
+  guessLabel?: string;
   title: string;
   options?: SessionRequestOptions;
 };
@@ -62,7 +65,8 @@ function historyOwnerKey(user: AuthUser | null, anonymousPlayerId: string): stri
   return `anon:${anonymousPlayerId}`;
 }
 
-export function useGameSession() {
+export function useGameSession(options?: { autoStepEnabled?: boolean }) {
+  const autoStepEnabled = options?.autoStepEnabled ?? true;
   const playerIdRef = useRef(getPlayerId());
   const authRequestSequenceRef = useRef(0);
   const initialAuthUser = readAuthUser();
@@ -70,6 +74,9 @@ export function useGameSession() {
   const [session, setSession] = useState<SessionSnapshot | null>(null);
   const [progression, setProgression] = useState<ProgressSnapshot | null>(null);
   const [progressionLoading, setProgressionLoading] = useState(true);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(initialAuthUser);
   const [authPendingAction, setAuthPendingAction] = useState<
     Extract<PendingActionKind, "login" | "logout" | "register"> | null
@@ -80,21 +87,25 @@ export function useGameSession() {
     readScoreHistory(initialHistoryOwner)
   );
   const [selectedGuess, setSelectedGuess] = useState<string | null>(null);
+  const [guessReminder, setGuessReminder] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingActionKind | null>(null);
   const [error, setError] = useState<SessionErrorState | null>(null);
   const mountedRef = useRef(true);
   const requestSequenceRef = useRef(0);
   const progressionSequenceRef = useRef(0);
+  const leaderboardSequenceRef = useRef(0);
   const lastFailedRequestRef = useRef<SessionRequestDescriptor | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
     void bootstrapSessionState();
+    void loadLeaderboard();
 
     return () => {
       mountedRef.current = false;
       requestSequenceRef.current += 1;
       progressionSequenceRef.current += 1;
+      leaderboardSequenceRef.current += 1;
       authRequestSequenceRef.current += 1;
     };
   }, []);
@@ -177,11 +188,44 @@ export function useGameSession() {
     }
   }
 
+  async function loadLeaderboard(silent = false) {
+    const requestId = leaderboardSequenceRef.current + 1;
+    leaderboardSequenceRef.current = requestId;
+    if (!silent || leaderboard.length === 0) {
+      setLeaderboardLoading(true);
+    }
+    setLeaderboardError(null);
+
+    try {
+      const next = await getLeaderboard();
+      if (!mountedRef.current || requestId !== leaderboardSequenceRef.current) {
+        return;
+      }
+      setLeaderboard(next);
+    } catch (requestError) {
+      if (!mountedRef.current || requestId !== leaderboardSequenceRef.current) {
+        return;
+      }
+      setLeaderboardError(getErrorMessage(requestError));
+    } finally {
+      if (
+        mountedRef.current &&
+        requestId === leaderboardSequenceRef.current &&
+        (!silent || leaderboard.length === 0)
+      ) {
+        setLeaderboardLoading(false);
+      }
+    }
+  }
+
   async function runSessionRequest(descriptor: SessionRequestDescriptor) {
     const requestId = requestSequenceRef.current + 1;
     requestSequenceRef.current = requestId;
     setPendingAction(descriptor.kind);
     setError(null);
+    if (descriptor.kind !== "guess") {
+      setGuessReminder(null);
+    }
 
     try {
       const next = await descriptor.requestFactory();
@@ -191,6 +235,18 @@ export function useGameSession() {
 
       lastFailedRequestRef.current = null;
       setSession(next);
+      const lastScoreEvent = next.score_events[next.score_events.length - 1] ?? null;
+      if (
+        descriptor.kind === "guess" &&
+        next.status === "playing" &&
+        lastScoreEvent?.kind === "guess_penalty"
+      ) {
+        setGuessReminder(
+          `选择错误：${descriptor.guessLabel ?? "该目标"}。剩余 ${next.remaining_guesses}/${next.max_guesses} 次猜测，稳定与污染已受影响。`
+        );
+      } else if (descriptor.kind === "guess") {
+        setGuessReminder(null);
+      }
       setSelectedGuess((current) => {
         if (
           descriptor.options?.keepGuess &&
@@ -228,7 +284,7 @@ export function useGameSession() {
   }
 
   useEffect(() => {
-    if (!session || session.status !== "playing" || pendingAction) {
+    if (!autoStepEnabled || !session || session.status !== "playing" || pendingAction) {
       return;
     }
 
@@ -244,7 +300,7 @@ export function useGameSession() {
     }, session.step_interval_ms);
 
     return () => window.clearTimeout(timer);
-  }, [pendingAction, session]);
+  }, [autoStepEnabled, pendingAction, session]);
 
   useEffect(() => {
     if (!session) {
@@ -253,6 +309,14 @@ export function useGameSession() {
 
     void loadProgression(true);
   }, [session?.session_id, session?.status]);
+
+  useEffect(() => {
+    if (!progression) {
+      return;
+    }
+
+    void loadLeaderboard(true);
+  }, [authUser?.id, progression?.campaign_total_score, progression?.completed_count]);
 
   useEffect(() => {
     if (!session || session.status === "playing" || !session.ended_at) {
@@ -328,14 +392,16 @@ export function useGameSession() {
     });
   }
 
-  async function submitSelectedGuess() {
-    if (!session || !selectedGuess) {
+  async function submitGuessChoice(label: string) {
+    if (!session) {
       return;
     }
 
+    setSelectedGuess(label);
     await runSessionRequest({
       kind: "guess",
-      requestFactory: () => submitGuess(session.session_id, selectedGuess),
+      guessLabel: label,
+      requestFactory: () => submitGuess(session.session_id, label),
       title: "提交猜测"
     });
   }
@@ -415,20 +481,26 @@ export function useGameSession() {
     authError,
     authUser,
     error,
+    leaderboard,
+    leaderboardError,
+    leaderboardLoading,
     pendingAction: authPendingAction ?? pendingAction,
     progression,
     progressionLoading,
+    guessReminder,
     selectedGuess,
     session,
     history,
-    setSelectedGuess,
     applyCard,
     advanceToNextLevel,
     login,
     logout,
     register,
+    retryLeaderboard: () => {
+      void loadLeaderboard();
+    },
     startRound,
-    submitSelectedGuess,
+    submitGuessChoice,
     retryLastAction,
     clearAuthError: () => setAuthError(null),
     clearError: () => setError(null)

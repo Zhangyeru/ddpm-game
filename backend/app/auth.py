@@ -38,11 +38,22 @@ class AuthUserRecord:
     username: str
 
 
+@dataclass(frozen=True)
+class LeaderboardRecord:
+    rank: int
+    user_id: str
+    username: str
+    campaign_total_score: int
+    completed_count: int
+    campaign_complete: bool
+
+
 @dataclass
 class PlayerCampaignProgress:
     current_level_id: str = field(default_factory=lambda: first_level().level_id)
     highest_unlocked_level_id: str = field(default_factory=lambda: first_level().level_id)
     completed_level_ids: set[str] = field(default_factory=set)
+    best_scores_by_level: dict[str, int] = field(default_factory=dict)
     streak: int = 0
     campaign_complete: bool = False
 
@@ -130,7 +141,8 @@ class SQLiteAuthStore:
         with self._lock, self._connect() as connection:
             row = connection.execute(
                 """
-                SELECT current_level_id, highest_unlocked_level_id, completed_level_ids, streak, campaign_complete
+                SELECT current_level_id, highest_unlocked_level_id, completed_level_ids,
+                       best_scores_by_level, streak, campaign_complete
                 FROM campaign_progress
                 WHERE user_id = ?
                 """,
@@ -147,6 +159,50 @@ class SQLiteAuthStore:
         with self._lock, self._connect() as connection:
             self._upsert_progress(connection, user_id, progress)
             connection.commit()
+
+    def list_leaderboard(self, *, limit: int | None = None) -> list[LeaderboardRecord]:
+        with self._lock, self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT users.id, users.username,
+                       campaign_progress.completed_level_ids,
+                       campaign_progress.best_scores_by_level,
+                       campaign_progress.campaign_complete
+                FROM users
+                INNER JOIN campaign_progress ON campaign_progress.user_id = users.id
+                """
+            ).fetchall()
+
+        records: list[tuple[str, str, int, int, bool]] = []
+        for row in rows:
+            completed_ids = json.loads(str(row["completed_level_ids"]))
+            raw_scores = json.loads(str(row["best_scores_by_level"]))
+            if not isinstance(raw_scores, dict):
+                raw_scores = {}
+            total_score = sum(int(score) for score in raw_scores.values())
+            records.append(
+                (
+                    str(row["id"]),
+                    str(row["username"]),
+                    total_score,
+                    len(list(completed_ids)),
+                    bool(row["campaign_complete"]),
+                )
+            )
+
+        records.sort(key=lambda item: (-item[2], -item[3], item[1].lower()))
+        visible_records = records if limit is None else records[: max(1, min(limit, 200))]
+        return [
+            LeaderboardRecord(
+                rank=index + 1,
+                user_id=user_id,
+                username=username,
+                campaign_total_score=campaign_total_score,
+                completed_count=completed_count,
+                campaign_complete=campaign_complete,
+            )
+            for index, (user_id, username, campaign_total_score, completed_count, campaign_complete) in enumerate(visible_records)
+        ]
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path, check_same_thread=False)
@@ -169,6 +225,7 @@ class SQLiteAuthStore:
                     current_level_id TEXT NOT NULL,
                     highest_unlocked_level_id TEXT NOT NULL,
                     completed_level_ids TEXT NOT NULL,
+                    best_scores_by_level TEXT NOT NULL DEFAULT '{}',
                     streak INTEGER NOT NULL,
                     campaign_complete INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL,
@@ -176,6 +233,17 @@ class SQLiteAuthStore:
                 );
                 """
             )
+            columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(campaign_progress)").fetchall()
+            }
+            if "best_scores_by_level" not in columns:
+                connection.execute(
+                    """
+                    ALTER TABLE campaign_progress
+                    ADD COLUMN best_scores_by_level TEXT NOT NULL DEFAULT '{}'
+                    """
+                )
             connection.commit()
 
     def _upsert_progress(
@@ -191,15 +259,17 @@ class SQLiteAuthStore:
                 current_level_id,
                 highest_unlocked_level_id,
                 completed_level_ids,
+                best_scores_by_level,
                 streak,
                 campaign_complete,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id) DO UPDATE SET
                 current_level_id = excluded.current_level_id,
                 highest_unlocked_level_id = excluded.highest_unlocked_level_id,
                 completed_level_ids = excluded.completed_level_ids,
+                best_scores_by_level = excluded.best_scores_by_level,
                 streak = excluded.streak,
                 campaign_complete = excluded.campaign_complete,
                 updated_at = excluded.updated_at
@@ -209,6 +279,7 @@ class SQLiteAuthStore:
                 progress.current_level_id,
                 progress.highest_unlocked_level_id,
                 json.dumps(sorted(progress.completed_level_ids), ensure_ascii=False),
+                json.dumps(progress.best_scores_by_level, ensure_ascii=False, sort_keys=True),
                 progress.streak,
                 1 if progress.campaign_complete else 0,
                 int(time.time()),
@@ -226,10 +297,19 @@ class SQLiteAuthStore:
     def _row_to_progress(self, row: sqlite3.Row) -> PlayerCampaignProgress:
         completed_raw = row["completed_level_ids"]
         completed_level_ids = set(json.loads(str(completed_raw)))
+        score_map_raw = row["best_scores_by_level"]
+        parsed_score_map = json.loads(str(score_map_raw))
+        if not isinstance(parsed_score_map, dict):
+            parsed_score_map = {}
+        best_scores_by_level = {
+            str(level_id): int(score)
+            for level_id, score in parsed_score_map.items()
+        }
         return PlayerCampaignProgress(
             current_level_id=str(row["current_level_id"]),
             highest_unlocked_level_id=str(row["highest_unlocked_level_id"]),
             completed_level_ids=completed_level_ids,
+            best_scores_by_level=best_scores_by_level,
             streak=int(row["streak"]),
             campaign_complete=bool(row["campaign_complete"]),
         )

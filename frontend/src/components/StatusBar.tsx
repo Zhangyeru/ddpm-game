@@ -5,12 +5,16 @@ import type {
   SessionSnapshot
 } from "../game/types";
 import { describeLivePriority } from "../content/gameGuide";
+import { formatLevelCode } from "../game/levelPresentation";
+import { formatSignedScore } from "../game/scorePresentation";
 
 type StatusBarProps = {
   authBusyAction: Extract<PendingActionKind, "login" | "logout" | "register"> | null;
   authUser: AuthUser | null;
   busyAction: PendingActionKind | null;
   historyCount: number;
+  leaderboardOpen: boolean;
+  onOpenLeaderboard: () => void;
   onOpenHistory: () => void;
   onLogout: () => void;
   progression: ProgressSnapshot | null;
@@ -23,6 +27,8 @@ export function StatusBar({
   authUser,
   busyAction,
   historyCount,
+  leaderboardOpen,
+  onOpenLeaderboard,
   onOpenHistory,
   onLogout,
   progression,
@@ -88,9 +94,9 @@ export function StatusBar({
           <span className="stat-label">关卡</span>
           <strong className="stat-value">
             {session
-              ? `第 ${session.chapter}-${session.level} 关`
+              ? formatLevelCode(session.chapter, session.level)
               : progressLevel
-                ? `第 ${progressLevel.chapter}-${progressLevel.level} 关`
+                ? formatLevelCode(progressLevel.chapter, progressLevel.level)
                 : "--"}
           </strong>
         </div>
@@ -113,9 +119,25 @@ export function StatusBar({
           </strong>
         </div>
         <div className="stat-card">
-          <span className="stat-label">{session ? "分数" : "猜测"}</span>
+          <span className="stat-label">{session ? "当前分数" : "总分"}</span>
           <strong className="stat-value">
-            {session ? session.score : progressLevel ? `${progressLevel.max_guesses} 次` : "--"}
+            {session
+              ? formatSignedScore(session.score)
+              : progression
+                ? formatSignedScore(progression.campaign_total_score)
+                : "--"}
+          </strong>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">{session ? "累计分数" : "猜测"}</span>
+          <strong className="stat-value">
+            {session
+              ? progression
+                ? formatSignedScore(progression.campaign_total_score)
+                : "--"
+              : progressLevel
+                ? `${progressLevel.max_guesses} 次`
+                : "--"}
           </strong>
         </div>
         <div className="stat-card">
@@ -124,10 +146,6 @@ export function StatusBar({
             {session ? session.stability : progressLevel ? `${progressLevel.max_cards} 张` : "--"}
           </strong>
         </div>
-        <div className="stat-card">
-          <span className="stat-label">状态</span>
-          <strong className="stat-value">{statusLabel}</strong>
-        </div>
       </div>
 
       <div className="session-actions">
@@ -135,13 +153,22 @@ export function StatusBar({
           {statusLabel}
         </span>
         <div className="session-action-row">
-          <button
-            className="secondary-button"
-            onClick={onOpenHistory}
-            type="button"
-          >
-            历史记录 {historyCount > 0 ? `(${historyCount})` : ""}
-          </button>
+          <div className="session-nav-stack">
+            <button
+              className="secondary-button"
+              onClick={onOpenLeaderboard}
+              type="button"
+            >
+              {leaderboardOpen ? "返回主界面" : "总分排行榜"}
+            </button>
+            <button
+              className="secondary-button"
+              onClick={onOpenHistory}
+              type="button"
+            >
+              历史记录 {historyCount > 0 ? `(${historyCount})` : ""}
+            </button>
+          </div>
           {authUser ? (
             <button
               className="secondary-button"

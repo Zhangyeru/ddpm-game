@@ -1,30 +1,41 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GameCanvas } from "./components/GameCanvas";
 import { GuessPanel } from "./components/GuessPanel";
 import { HistoryDrawer } from "./components/HistoryDrawer";
 import { InlineError } from "./components/InlineError";
 import { LandingGuide } from "./components/LandingGuide";
+import { LeaderboardPage } from "./components/LeaderboardPage";
 import { LoadingRoundShell } from "./components/LoadingRoundShell";
 import { ScorePanel } from "./components/ScorePanel";
 import { StatusBar } from "./components/StatusBar";
 import { ToolPanel } from "./components/ToolPanel";
 import { useGameSession } from "./game/useGameSession";
 
+type AppPage = "home" | "leaderboard";
+
+function readAppPage(): AppPage {
+  return window.location.hash === "#leaderboard" ? "leaderboard" : "home";
+}
+
 export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [page, setPage] = useState<AppPage>(() => readAppPage());
   const {
     authBusyAction,
     authError,
     authUser,
     controlsDisabled,
     error,
+    leaderboard,
+    leaderboardError,
+    leaderboardLoading,
     pendingAction,
     progression,
     progressionLoading,
+    guessReminder,
     selectedGuess,
     session,
     history,
-    setSelectedGuess,
     applyCard,
     advanceToNextLevel,
     clearAuthError,
@@ -32,10 +43,35 @@ export default function App() {
     login,
     logout,
     register,
-    submitSelectedGuess,
+    submitGuessChoice,
     retryLastAction,
+    retryLeaderboard,
     clearError
-  } = useGameSession();
+  } = useGameSession({ autoStepEnabled: page !== "leaderboard" });
+
+  useEffect(() => {
+    function handleHashChange() {
+      setPage(readAppPage());
+    }
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  function openLeaderboard() {
+    window.location.hash = "leaderboard";
+  }
+
+  function openHome() {
+    if (window.location.hash) {
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${window.location.search}`
+      );
+    }
+    setPage("home");
+  }
 
   return (
     <div className="app-shell">
@@ -44,6 +80,14 @@ export default function App() {
         authUser={authUser}
         busyAction={pendingAction}
         historyCount={history.length}
+        leaderboardOpen={page === "leaderboard"}
+        onOpenLeaderboard={() => {
+          if (page === "leaderboard") {
+            openHome();
+            return;
+          }
+          openLeaderboard();
+        }}
         onOpenHistory={() => setHistoryOpen(true)}
         onLogout={() => {
           void logout();
@@ -66,7 +110,19 @@ export default function App() {
         />
       ) : null}
 
-      {!session && (pendingAction === "start" || progressionLoading) ? (
+      {page === "leaderboard" ? (
+        <LeaderboardPage
+          authUser={authUser}
+          entries={leaderboard}
+          error={leaderboardError}
+          loading={leaderboardLoading}
+          onBack={openHome}
+          onRetry={() => {
+            void retryLeaderboard();
+          }}
+          progression={progression}
+        />
+      ) : !session && (pendingAction === "start" || progressionLoading) ? (
         <LoadingRoundShell />
       ) : !session ? (
         <LandingGuide
@@ -77,6 +133,7 @@ export default function App() {
           onClearAuthError={clearAuthError}
           onLogin={login}
           onLogout={logout}
+          onOpenLeaderboard={openLeaderboard}
           onRegister={register}
           progression={progression}
           onStart={() => {
@@ -105,12 +162,12 @@ export default function App() {
             <GuessPanel
               busyAction={pendingAction}
               disabled={controlsDisabled}
+              guessReminder={guessReminder}
               labels={session.candidate_labels}
               missionTitle={session.mission_title}
-              onConfirm={() => {
-                void submitSelectedGuess();
+              onGuess={(label) => {
+                void submitGuessChoice(label);
               }}
-              onSelect={setSelectedGuess}
               selectedGuess={selectedGuess}
             />
             <GameCanvas session={session} />

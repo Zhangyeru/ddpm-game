@@ -58,6 +58,7 @@ export interface LevelProgressItem {
   max_guesses: number;
   max_cards: number;
   candidate_count: number;
+  best_score: number | null;
   is_current: boolean;
   is_completed: boolean;
   is_unlocked: boolean;
@@ -70,6 +71,8 @@ export interface ProgressSnapshot {
   completed_count: number;
   total_levels: number;
   campaign_complete: boolean;
+  campaign_total_score: number;
+  best_scores_by_level: Record<string, number>;
   current_level: LevelProgressItem;
   levels: LevelProgressItem[];
 }
@@ -89,6 +92,15 @@ export interface AuthResponse {
 export interface AuthSessionSnapshot {
   user: AuthUser;
   progression: ProgressSnapshot;
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  user_id: string;
+  username: string;
+  campaign_total_score: number;
+  completed_count: number;
+  campaign_complete: boolean;
 }
 
 export interface SessionSnapshot {
@@ -133,6 +145,8 @@ export interface SessionSnapshot {
   next_level_title: string | null;
   next_level_summary: string | null;
   campaign_complete: boolean;
+  level_best_score: number | null;
+  level_best_improved: boolean;
 }
 
 export interface ScoreHistoryEntry {
