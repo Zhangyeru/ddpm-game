@@ -1,8 +1,11 @@
 import type {
+  AuthResponse,
+  AuthSessionSnapshot,
   CardId,
   ProgressSnapshot,
   SessionSnapshot
 } from "../game/types";
+import { readAuthToken } from "./authStorage";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
@@ -29,7 +32,12 @@ async function request<T>(
   init?: RequestInit
 ): Promise<T> {
   const headers = new Headers(init?.headers);
-  headers.set("X-Player-Id", getPlayerId());
+  const token = readAuthToken();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  } else {
+    headers.set("X-Player-Id", getPlayerId());
+  }
   if (init?.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -53,6 +61,30 @@ async function request<T>(
   }
 
   return (await response.json()) as T;
+}
+
+export function registerUser(
+  username: string,
+  password: string
+): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ username, password })
+  });
+}
+
+export function loginUser(
+  username: string,
+  password: string
+): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password })
+  });
+}
+
+export function getCurrentUser(): Promise<AuthSessionSnapshot> {
+  return request<AuthSessionSnapshot>("/auth/me");
 }
 
 export function startSession(): Promise<SessionSnapshot> {

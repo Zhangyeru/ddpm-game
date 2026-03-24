@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type {
+  AuthUser,
   CardId,
   PendingActionKind,
   ProgressSnapshot,
@@ -12,13 +13,22 @@ import {
 } from "./scoreHistory";
 import {
   advanceLevel,
+  getCurrentUser,
   getPlayerId,
   getProgression,
+  loginUser,
+  registerUser,
   startCurrentLevel,
   stepSession,
   submitGuess,
   useCard
 } from "../services/api";
+import {
+  clearAuthSession,
+  readAuthToken,
+  readAuthUser,
+  saveAuthSession
+} from "../services/authStorage";
 
 type SessionRequestOptions = {
   keepGuess?: boolean;
@@ -44,13 +54,30 @@ function getErrorMessage(error: unknown): string {
   return "请求失败，请稍后重试。";
 }
 
+function historyOwnerKey(user: AuthUser | null, anonymousPlayerId: string): string {
+  if (user) {
+    return `user:${user.id}`;
+  }
+
+  return `anon:${anonymousPlayerId}`;
+}
+
 export function useGameSession() {
   const playerIdRef = useRef(getPlayerId());
+  const authRequestSequenceRef = useRef(0);
+  const initialAuthUser = readAuthUser();
+  const initialHistoryOwner = historyOwnerKey(initialAuthUser, playerIdRef.current);
   const [session, setSession] = useState<SessionSnapshot | null>(null);
   const [progression, setProgression] = useState<ProgressSnapshot | null>(null);
   const [progressionLoading, setProgressionLoading] = useState(true);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(initialAuthUser);
+  const [authPendingAction, setAuthPendingAction] = useState<
+    Extract<PendingActionKind, "login" | "logout" | "register"> | null
+  >(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [historyOwner, setHistoryOwner] = useState(initialHistoryOwner);
   const [history, setHistory] = useState<ScoreHistoryEntry[]>(() =>
-    readScoreHistory(playerIdRef.current)
+    readScoreHistory(initialHistoryOwner)
   );
   const [selectedGuess, setSelectedGuess] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingActionKind | null>(null);
@@ -62,14 +89,65 @@ export function useGameSession() {
 
   useEffect(() => {
     mountedRef.current = true;
-    void loadProgression();
+    void bootstrapSessionState();
 
     return () => {
       mountedRef.current = false;
       requestSequenceRef.current += 1;
       progressionSequenceRef.current += 1;
+      authRequestSequenceRef.current += 1;
     };
   }, []);
+
+  async function bootstrapSessionState() {
+    const requestId = progressionSequenceRef.current + 1;
+    progressionSequenceRef.current = requestId;
+    setProgressionLoading(true);
+
+    const token = readAuthToken();
+    if (token) {
+      try {
+        const authSession = await getCurrentUser();
+        if (!mountedRef.current || requestId !== progressionSequenceRef.current) {
+          return;
+        }
+
+        setAuthUser(authSession.user);
+        setAuthError(null);
+        setProgression(authSession.progression);
+        const nextHistoryOwner = historyOwnerKey(authSession.user, playerIdRef.current);
+        setHistoryOwner(nextHistoryOwner);
+        setHistory(readScoreHistory(nextHistoryOwner));
+        setProgressionLoading(false);
+        return;
+      } catch {
+        clearAuthSession();
+        if (!mountedRef.current || requestId !== progressionSequenceRef.current) {
+          return;
+        }
+        setAuthUser(null);
+      }
+    }
+
+    try {
+      const next = await getProgression();
+      if (!mountedRef.current || requestId !== progressionSequenceRef.current) {
+        return;
+      }
+      const nextHistoryOwner = historyOwnerKey(null, playerIdRef.current);
+      setHistoryOwner(nextHistoryOwner);
+      setHistory(readScoreHistory(nextHistoryOwner));
+      setProgression(next);
+    } catch {
+      if (!mountedRef.current || requestId !== progressionSequenceRef.current) {
+        return;
+      }
+    } finally {
+      if (mountedRef.current && requestId === progressionSequenceRef.current) {
+        setProgressionLoading(false);
+      }
+    }
+  }
 
   async function loadProgression(silent = false) {
     const requestId = progressionSequenceRef.current + 1;
@@ -181,8 +259,52 @@ export function useGameSession() {
       return;
     }
 
-    setHistory(saveFinishedSessionHistory(playerIdRef.current, session));
-  }, [session]);
+    setHistory(saveFinishedSessionHistory(historyOwner, session));
+  }, [historyOwner, session]);
+
+  async function runAuthRequest(
+    kind: Extract<PendingActionKind, "login" | "register">,
+    requestFactory: () => Promise<{
+      access_token: string;
+      progression: ProgressSnapshot;
+      user: AuthUser;
+    }>
+  ) {
+    const requestId = authRequestSequenceRef.current + 1;
+    authRequestSequenceRef.current = requestId;
+    setAuthPendingAction(kind);
+    setAuthError(null);
+
+    try {
+      const response = await requestFactory();
+      if (!mountedRef.current || requestId !== authRequestSequenceRef.current) {
+        return false;
+      }
+
+      saveAuthSession(response.access_token, response.user);
+      setAuthUser(response.user);
+      setProgression(response.progression);
+      setSession(null);
+      setSelectedGuess(null);
+      setError(null);
+      lastFailedRequestRef.current = null;
+      const nextHistoryOwner = historyOwnerKey(response.user, playerIdRef.current);
+      setHistoryOwner(nextHistoryOwner);
+      setHistory(readScoreHistory(nextHistoryOwner));
+      return true;
+    } catch (requestError) {
+      if (!mountedRef.current || requestId !== authRequestSequenceRef.current) {
+        return false;
+      }
+
+      setAuthError(getErrorMessage(requestError));
+      return false;
+    } finally {
+      if (mountedRef.current && requestId === authRequestSequenceRef.current) {
+        setAuthPendingAction(null);
+      }
+    }
+  }
 
   async function startRound() {
     setSelectedGuess(null);
@@ -241,11 +363,59 @@ export function useGameSession() {
     await runSessionRequest(lastFailedRequestRef.current);
   }
 
+  async function login(username: string, password: string) {
+    await runAuthRequest("login", () => loginUser(username, password));
+  }
+
+  async function register(username: string, password: string) {
+    await runAuthRequest("register", () => registerUser(username, password));
+  }
+
+  async function logout() {
+    const requestId = authRequestSequenceRef.current + 1;
+    authRequestSequenceRef.current = requestId;
+    setAuthPendingAction("logout");
+    setAuthError(null);
+    clearAuthSession();
+    setAuthUser(null);
+    setSession(null);
+    setSelectedGuess(null);
+    setError(null);
+    lastFailedRequestRef.current = null;
+
+    const nextHistoryOwner = historyOwnerKey(null, playerIdRef.current);
+    setHistoryOwner(nextHistoryOwner);
+    setHistory(readScoreHistory(nextHistoryOwner));
+
+    try {
+      const next = await getProgression();
+      if (!mountedRef.current || requestId !== authRequestSequenceRef.current) {
+        return;
+      }
+      setProgression(next);
+    } catch (requestError) {
+      if (!mountedRef.current || requestId !== authRequestSequenceRef.current) {
+        return;
+      }
+      setAuthError(getErrorMessage(requestError));
+    } finally {
+      if (mountedRef.current && requestId === authRequestSequenceRef.current) {
+        setAuthPendingAction(null);
+      }
+    }
+  }
+
   return {
     controlsDisabled:
-      pendingAction !== null || !session || session.status !== "playing",
+      pendingAction !== null ||
+      authPendingAction !== null ||
+      !session ||
+      session.status !== "playing",
+    authBusyAction: authPendingAction,
+    authError,
+    authUser,
     error,
-    pendingAction,
+    pendingAction: authPendingAction ?? pendingAction,
     progression,
     progressionLoading,
     selectedGuess,
@@ -254,9 +424,13 @@ export function useGameSession() {
     setSelectedGuess,
     applyCard,
     advanceToNextLevel,
+    login,
+    logout,
+    register,
     startRound,
     submitSelectedGuess,
     retryLastAction,
+    clearAuthError: () => setAuthError(null),
     clearError: () => setError(null)
   };
 }

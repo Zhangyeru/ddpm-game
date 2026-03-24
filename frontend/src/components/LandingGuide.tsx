@@ -1,4 +1,5 @@
-import type { ProgressSnapshot } from "../game/types";
+import type { AuthUser, PendingActionKind, ProgressSnapshot } from "../game/types";
+import { AuthPanel } from "./AuthPanel";
 import {
   CARD_TOOL_GUIDE,
   MISSION_GUIDES,
@@ -29,13 +30,27 @@ const QUICK_STEPS = [
 ] as const;
 
 type LandingGuideProps = {
+  authBusyAction: Extract<PendingActionKind, "login" | "logout" | "register"> | null;
+  authError: string | null;
+  authUser: AuthUser | null;
   busy?: boolean;
+  onClearAuthError: () => void;
+  onLogin: (username: string, password: string) => Promise<void>;
+  onLogout: () => Promise<void>;
+  onRegister: (username: string, password: string) => Promise<void>;
   progression: ProgressSnapshot | null;
   onStart: () => void;
 };
 
 export function LandingGuide({
+  authBusyAction,
+  authError,
+  authUser,
   busy = false,
+  onClearAuthError,
+  onLogin,
+  onLogout,
+  onRegister,
   progression,
   onStart
 }: LandingGuideProps) {
@@ -202,6 +217,17 @@ export function LandingGuide({
       </div>
 
       <div className="landing-column landing-column--side">
+        <AuthPanel
+          authBusyAction={authBusyAction}
+          authError={authError}
+          authUser={authUser}
+          onClearError={onClearAuthError}
+          onLogin={onLogin}
+          onLogout={onLogout}
+          onRegister={onRegister}
+          progression={progression}
+        />
+
         <section className="panel landing-panel landing-panel--summary">
           <div className="panel-heading">
             <div>

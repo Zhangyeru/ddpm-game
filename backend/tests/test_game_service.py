@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.parse import parse_qs, urlparse
 
+from backend.app.auth import SQLiteAuthStore, actor_id_for_user
 from backend.app.gameplay_config import (
     GAME_CONFIG,
     calculate_loss_breakdown,
@@ -256,6 +257,38 @@ class GameServiceTest(unittest.TestCase):
         self.assertTrue(progression.campaign_complete)
         self.assertEqual(progression.current_level_id, "chapter-1-level-1")
         self.assertEqual(progression.completed_count, 12)
+
+    def test_authenticated_progress_persists_in_sqlite_store(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            auth_store = SQLiteAuthStore(Path(temp_dir) / "auth.sqlite3")
+            user = auth_store.create_user("tester_01", "hashed-password")
+            actor_id = actor_id_for_user(user.id)
+            service = GameService(
+                trajectory_store=self.trajectory_store,
+                auth_store=auth_store,
+                clock=self.clock,
+            )
+
+            snapshot = service.start_current_level(actor_id)
+            session = service.sessions[snapshot.session_id]
+            won = service.guess(actor_id, snapshot.session_id, session.target.label)
+            service.advance(actor_id, won.session_id)
+
+            persisted_progress = auth_store.get_or_create_progress(user.id)
+            self.assertEqual(persisted_progress.current_level_id, "chapter-1-level-2")
+            self.assertEqual(
+                persisted_progress.highest_unlocked_level_id,
+                "chapter-1-level-2",
+            )
+            self.assertIn("chapter-1-level-1", persisted_progress.completed_level_ids)
+
+            next_service = GameService(
+                trajectory_store=self.trajectory_store,
+                auth_store=auth_store,
+                clock=self.clock,
+            )
+            progression = next_service.get_progression(actor_id)
+            self.assertEqual(progression.current_level_id, "chapter-1-level-2")
 
 
 class TrajectoryStoreTest(unittest.TestCase):

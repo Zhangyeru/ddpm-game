@@ -1,4 +1,5 @@
 import type {
+  AuthUser,
   PendingActionKind,
   ProgressSnapshot,
   SessionSnapshot
@@ -6,18 +7,24 @@ import type {
 import { describeLivePriority } from "../content/gameGuide";
 
 type StatusBarProps = {
+  authBusyAction: Extract<PendingActionKind, "login" | "logout" | "register"> | null;
+  authUser: AuthUser | null;
   busyAction: PendingActionKind | null;
   historyCount: number;
   onOpenHistory: () => void;
+  onLogout: () => void;
   progression: ProgressSnapshot | null;
   session: SessionSnapshot | null;
   onStart: () => void;
 };
 
 export function StatusBar({
+  authBusyAction,
+  authUser,
   busyAction,
   historyCount,
   onOpenHistory,
+  onLogout,
   progression,
   session,
   onStart
@@ -68,6 +75,11 @@ export function StatusBar({
               ? session.mission_title
               : progressLevel?.mission_title ?? "继续推进当前关卡"}
           </span>
+          {authUser ? (
+            <span className="title-chip">{`已登录 · ${authUser.username}`}</span>
+          ) : (
+            <span className="title-chip">游客模式</span>
+          )}
         </div>
       </div>
 
@@ -130,10 +142,20 @@ export function StatusBar({
           >
             历史记录 {historyCount > 0 ? `(${historyCount})` : ""}
           </button>
+          {authUser ? (
+            <button
+              className="secondary-button"
+              disabled={authBusyAction === "logout"}
+              onClick={onLogout}
+              type="button"
+            >
+              {authBusyAction === "logout" ? "退出中..." : "退出登录"}
+            </button>
+          ) : null}
           <button
             className="action-button"
             onClick={onStart}
-            disabled={busyAction !== null}
+            disabled={busyAction !== null || authBusyAction !== null}
             type="button"
           >
             {actionLabel}

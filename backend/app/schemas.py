@@ -14,6 +14,16 @@ class GuessRequest(BaseModel):
     label: str
 
 
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
 class UseCardRequest(BaseModel):
     card_id: CardId
 
@@ -70,6 +80,23 @@ class ProgressSnapshot(BaseModel):
     campaign_complete: bool
     current_level: LevelProgressItem
     levels: list[LevelProgressItem]
+
+
+class AuthUser(BaseModel):
+    id: str
+    username: str
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"]
+    user: AuthUser
+    progression: ProgressSnapshot
+
+
+class AuthSessionSnapshot(BaseModel):
+    user: AuthUser
+    progression: ProgressSnapshot
 
 
 class SessionSnapshot(BaseModel):

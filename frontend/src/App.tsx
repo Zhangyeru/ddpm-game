@@ -13,6 +13,9 @@ import { useGameSession } from "./game/useGameSession";
 export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const {
+    authBusyAction,
+    authError,
+    authUser,
     controlsDisabled,
     error,
     pendingAction,
@@ -24,7 +27,11 @@ export default function App() {
     setSelectedGuess,
     applyCard,
     advanceToNextLevel,
+    clearAuthError,
     startRound,
+    login,
+    logout,
+    register,
     submitSelectedGuess,
     retryLastAction,
     clearError
@@ -33,9 +40,14 @@ export default function App() {
   return (
     <div className="app-shell">
       <StatusBar
+        authBusyAction={authBusyAction}
+        authUser={authUser}
         busyAction={pendingAction}
         historyCount={history.length}
         onOpenHistory={() => setHistoryOpen(true)}
+        onLogout={() => {
+          void logout();
+        }}
         onStart={() => {
           void startRound();
         }}
@@ -58,7 +70,14 @@ export default function App() {
         <LoadingRoundShell />
       ) : !session ? (
         <LandingGuide
+          authBusyAction={authBusyAction}
+          authError={authError}
+          authUser={authUser}
           busy={pendingAction === "start"}
+          onClearAuthError={clearAuthError}
+          onLogin={login}
+          onLogout={logout}
+          onRegister={register}
           progression={progression}
           onStart={() => {
             void startRound();

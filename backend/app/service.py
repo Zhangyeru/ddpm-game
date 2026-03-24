@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from threading import RLock
 from typing import Callable
 
+from .auth import PlayerCampaignProgress, SQLiteAuthStore, is_user_actor, user_id_from_actor
 from .frame_renderer import DEFAULT_TOTAL_FRAMES
 from .game_data import CARD_DEFINITIONS, TARGETS, TargetDefinition
 from .gameplay_config import (
@@ -95,23 +96,16 @@ class Session:
     last_touched_at: float = field(default_factory=time.monotonic)
 
 
-@dataclass
-class PlayerCampaignProgress:
-    current_level_id: str = field(default_factory=lambda: first_level().level_id)
-    highest_unlocked_level_id: str = field(default_factory=lambda: first_level().level_id)
-    completed_level_ids: set[str] = field(default_factory=set)
-    streak: int = 0
-    campaign_complete: bool = False
-
-
 class GameService:
     def __init__(
         self,
         trajectory_store: TrajectoryStore | None = None,
         *,
+        auth_store: SQLiteAuthStore | None = None,
         clock: Callable[[], float] | None = None,
     ) -> None:
         self.trajectory_store = trajectory_store or TrajectoryStore()
+        self.auth_store = auth_store
         self.clock = clock or time.monotonic
         self.sessions: dict[str, Session] = {}
         self.player_progress: dict[str, PlayerCampaignProgress] = {}
@@ -164,6 +158,7 @@ class GameService:
 
             progress = self._campaign_progress(session.player_id)
             progress.current_level_id = session.next_level_id
+            self._save_campaign_progress(session.player_id, progress)
             next_definition = level_by_id(session.next_level_id)
             next_session = self._build_session(session.player_id, progress, next_definition)
             self.sessions[next_session.session_id] = next_session
@@ -343,7 +338,20 @@ class GameService:
 
     def _campaign_progress(self, player_id: str | None) -> PlayerCampaignProgress:
         player_key = self._normalize_player_id(player_id)
+        if is_user_actor(player_key) and self.auth_store is not None:
+            return self.auth_store.get_or_create_progress(user_id_from_actor(player_key))
         return self.player_progress.setdefault(player_key, PlayerCampaignProgress())
+
+    def _save_campaign_progress(
+        self,
+        player_id: str | None,
+        progress: PlayerCampaignProgress,
+    ) -> None:
+        player_key = self._normalize_player_id(player_id)
+        if is_user_actor(player_key) and self.auth_store is not None:
+            self.auth_store.save_progress(user_id_from_actor(player_key), progress)
+            return
+        self.player_progress[player_key] = progress
 
     def _build_session(
         self,
@@ -412,6 +420,7 @@ class GameService:
             session.next_level_title = None
             session.next_level_summary = "已完成全部 12 关。你可以从第一关重新挑战整套档案。"
             self._append_event(session, "终端审判完成，整套档案已归档。")
+            self._save_campaign_progress(session.player_id, progress)
             return
 
         session.awaiting_advancement = True
@@ -424,6 +433,7 @@ class GameService:
             session,
             f"已解锁下一关：第 {upcoming.chapter}-{upcoming.level} 关 {upcoming.level_title}。",
         )
+        self._save_campaign_progress(session.player_id, progress)
 
     def _get_session(self, player_id: str | None, session_id: str) -> Session:
         self._prune_expired_sessions()
@@ -438,11 +448,13 @@ class GameService:
     def _record_win(self, player_id: str | None) -> int:
         progress = self._campaign_progress(player_id)
         progress.streak += 1
+        self._save_campaign_progress(player_id, progress)
         return progress.streak
 
     def _record_loss(self, player_id: str | None) -> None:
         progress = self._campaign_progress(player_id)
         progress.streak = 0
+        self._save_campaign_progress(player_id, progress)
 
     def _append_event(self, session: Session, message: str) -> None:
         session.events.append(message)
@@ -728,6 +740,11 @@ class GameService:
         normalized = player_id.strip()
         if not normalized:
             return "anonymous"
+        if is_user_actor(normalized):
+            return normalized
+        if normalized.startswith("anon:"):
+            suffix = normalized.split(":", 1)[1].strip()
+            return f"anon:{(suffix or 'anonymous')[:64]}"
         return normalized[:64]
 
     def _validate_level_definitions(self) -> None:

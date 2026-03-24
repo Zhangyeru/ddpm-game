@@ -6,7 +6,10 @@ export type CardId =
 export type GameStatus = "playing" | "won" | "lost";
 export type PendingActionKind =
   | "advance"
+  | "login"
   | "progression"
+  | "logout"
+  | "register"
   | "start"
   | "step"
   | "guess"
@@ -69,6 +72,23 @@ export interface ProgressSnapshot {
   campaign_complete: boolean;
   current_level: LevelProgressItem;
   levels: LevelProgressItem[];
+}
+
+export interface AuthUser {
+  id: string;
+  username: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: "bearer";
+  user: AuthUser;
+  progression: ProgressSnapshot;
+}
+
+export interface AuthSessionSnapshot {
+  user: AuthUser;
+  progression: ProgressSnapshot;
 }
 
 export interface SessionSnapshot {
