@@ -8,10 +8,61 @@ import type {
 } from "../game/types";
 import { readAuthToken } from "./authStorage";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
-const API_ORIGIN = new URL(API_BASE_URL).origin;
+const DEFAULT_API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = normalizeBaseUrl(
+  import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL
+);
+const API_ORIGIN = resolveApiOrigin(API_BASE_URL);
 const PLAYER_ID_STORAGE_KEY = "noise-archaeologist-player-id";
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+function normalizeBaseUrl(value: string): string {
+  const trimmed = value.trim();
+  return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
+}
+
+function normalizePath(path: string): string {
+  return path.startsWith("/") ? path : `/${path}`;
+}
+
+function isAbsoluteUrl(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveApiOrigin(baseUrl: string): string | null {
+  if (isAbsoluteUrl(baseUrl)) {
+    return new URL(baseUrl).origin;
+  }
+
+  return typeof window === "undefined" ? null : window.location.origin;
+}
+
+function resolveRequestUrl(path: string): string {
+  const normalizedPath = normalizePath(path);
+
+  if (isAbsoluteUrl(API_BASE_URL)) {
+    return `${API_BASE_URL}${normalizedPath}`;
+  }
+
+  const normalizedBase = API_BASE_URL.startsWith("/")
+    ? API_BASE_URL
+    : `/${API_BASE_URL}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
 
 export function getPlayerId(): string {
   try {
@@ -43,7 +94,7 @@ async function request<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(resolveRequestUrl(path), {
     headers,
     ...init
   });
@@ -54,11 +105,11 @@ async function request<T>(
       const payload = (await response.json()) as {
         detail?: string;
       };
-      throw new Error(payload.detail || "接口请求失败。");
+      throw new ApiError(response.status, payload.detail || "接口请求失败。");
     }
 
     const message = await response.text();
-    throw new Error(message || "接口请求失败。");
+    throw new ApiError(response.status, message || "接口请求失败。");
   }
 
   return (await response.json()) as T;
@@ -145,5 +196,14 @@ export function advanceLevel(
 }
 
 export function resolveApiUrl(path: string): string {
-  return new URL(path, API_ORIGIN).toString();
+  if (isAbsoluteUrl(path)) {
+    return path;
+  }
+
+  const normalizedPath = normalizePath(path);
+  if (API_ORIGIN === null) {
+    return normalizedPath;
+  }
+
+  return new URL(normalizedPath, API_ORIGIN).toString();
 }

@@ -5,6 +5,7 @@ import unittest
 from PIL import Image
 
 from backend.app.diffusion_trajectory import (
+    DEFAULT_NEGATIVE_PROMPT,
     DiffusionTrajectoryGenerator,
     GenerationConfig,
     corruption_step_indices,
@@ -31,7 +32,10 @@ class DiffusionTrajectoryTest(unittest.TestCase):
         plan = resolve_variant_plan(target=target, variant=TRAJECTORY_VARIANTS["focus_living"])
 
         self.assertIn("cat", plan.prompt)
+        self.assertIn("real-world documentary photograph", plan.prompt)
+        self.assertIn("natural lighting", plan.prompt)
         self.assertIn("organic details", plan.prompt)
+        self.assertEqual(plan.negative_prompt, DEFAULT_NEGATIVE_PROMPT)
         self.assertGreater(plan.guidance_scale, 1.0)
         self.assertLess(plan.inversion_guidance_scale, plan.guidance_scale)
 
@@ -40,6 +44,7 @@ class DiffusionTrajectoryTest(unittest.TestCase):
         plan = resolve_variant_plan(target=target, variant=TRAJECTORY_VARIANTS["misguided"])
 
         self.assertIn("vehicle or machine", plan.prompt)
+        self.assertIn("real-world documentary photograph", plan.prompt)
         self.assertNotIn("cat", plan.prompt)
 
     def test_generator_passes_100_frame_config_to_backend(self) -> None:
