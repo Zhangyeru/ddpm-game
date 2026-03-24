@@ -19,6 +19,8 @@ export function GuessPanel({
   missionTitle,
   onGuess
 }: GuessPanelProps) {
+  const hiddenCount = labels.filter((label) => label === "未知信号").length;
+
   return (
     <section className="panel guess-panel">
       <div className="panel-heading">
@@ -34,17 +36,17 @@ export function GuessPanel({
       </div>
 
       <p className="guess-intro">
-        当前候选 {labels.length} 项。{missionTitle} 点击任一候选后会直接作为本次猜测提交。
+        当前候选 {labels.length} 项{hiddenCount > 0 ? `，其中 ${hiddenCount} 项尚未解锁` : ""}。{missionTitle} 点击任一已显露候选后会直接作为本次猜测提交。
       </p>
 
       <div className="guess-grid">
-        {labels.map((label) => (
+        {labels.map((label, index) => (
           <button
-            key={label}
+            key={`${label}-${index}`}
             className={`guess-chip ${
               selectedGuess === label ? "guess-chip--active" : ""
             }`}
-            disabled={disabled}
+            disabled={disabled || label === "未知信号"}
             onClick={() => onGuess(label)}
             type="button"
           >
