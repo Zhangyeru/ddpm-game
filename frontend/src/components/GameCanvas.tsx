@@ -28,7 +28,6 @@ export function GameCanvas({ session }: GameCanvasProps) {
             <p className="canvas-meta">
               帧 {session.frame_index + 1}/{session.total_frames}
             </p>
-            <p className="canvas-meta">{session.phase_label}</p>
           </div>
         ) : null}
       </div>
@@ -82,33 +81,6 @@ export function GameCanvas({ session }: GameCanvasProps) {
               style={{ width: `${corruptionPercent}%` }}
             />
           </div>
-        </div>
-      </div>
-
-      <div className="canvas-readout">
-        <div>
-          <span className="readout-label">提示谱带</span>
-          <strong>{session?.hint ?? "等待锁定目标。"}</strong>
-        </div>
-        <div>
-          <span className="readout-label">风险等级</span>
-          <strong>
-            {session ? session.threat_label : "--"}
-          </strong>
-        </div>
-        <div>
-          <span className="readout-label">当前任务</span>
-          <strong>
-            {session?.mission_title ?? "等待任务分配"}
-          </strong>
-        </div>
-        <div>
-          <span className="readout-label">资源摘要</span>
-          <strong>
-            {session
-              ? `剩余 ${session.frames_remaining} 帧 / 猜测 ${session.remaining_guesses} / 卡牌 ${session.cards_remaining}`
-              : "--"}
-          </strong>
         </div>
       </div>
     </section>

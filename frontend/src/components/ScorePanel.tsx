@@ -1,9 +1,4 @@
-import {
-  SCORE_FORMULA_LABEL,
-  describeLivePriority,
-  describeMissionFocus,
-  summarizeToolPenalty
-} from "../content/gameGuide";
+import { describeMissionFocus } from "../content/gameGuide";
 import { ScoreBreakdownGrid } from "./ScoreBreakdownGrid";
 import { ScoreEventList } from "./ScoreEventList";
 import {
@@ -11,37 +6,114 @@ import {
   formatSignedScore,
   breakdownItems
 } from "../game/scorePresentation";
-import type { SessionSnapshot } from "../game/types";
+import type {
+  PendingActionKind,
+  ProgressSnapshot,
+  SessionSnapshot
+} from "../game/types";
 
 type ScorePanelProps = {
+  busyAction: PendingActionKind | null;
   historyCount: number;
+  onAdvance: () => void;
   onOpenHistory: () => void;
+  onRetryLevel: () => void;
+  progression: ProgressSnapshot | null;
   session: SessionSnapshot;
 };
 
 export function ScorePanel({
+  busyAction,
   historyCount,
+  onAdvance,
   onOpenHistory,
+  onRetryLevel,
+  progression,
   session
 }: ScorePanelProps) {
-  const focus = describeMissionFocus(session.mission_title);
-  const livePriority = describeLivePriority(session);
   const breakdown = session.score_breakdown;
   const isFinished = session.status !== "playing";
-  const latestEvents = isFinished ? 5 : 3;
+
+  if (!isFinished) {
+    return (
+      <section className="panel result-panel result-panel--live">
+        <div className="panel-heading result-panel__hero result-panel__hero--live">
+          <div>
+            <p className="eyebrow">本局状态</p>
+            <h2>{session.level_title}</h2>
+            <div className="result-meta-row">
+              <span className="result-meta-chip">{session.chapter_title}</span>
+              <span className="result-meta-chip">{`第 ${session.chapter}-${session.level} 关`}</span>
+            </div>
+          </div>
+          <span className="tool-counter">{session.threat_label}</span>
+        </div>
+
+        <div className="live-score-card">
+          <span className="readout-label">当前分数</span>
+          <strong className="live-score-value">{formatSignedScore(session.score)}</strong>
+          <span className="live-score-meta">
+            {progression
+              ? `已完成 ${progression.completed_count}/${progression.total_levels}`
+              : "当前关进行中"}
+          </span>
+        </div>
+
+        <div className="live-risk-grid">
+          <article className="result-card live-metric-card">
+            <span className="readout-label">稳定度</span>
+            <strong>{session.stability}</strong>
+          </article>
+          <article className="result-card live-metric-card">
+            <span className="readout-label">污染度</span>
+            <strong>{session.corruption}</strong>
+          </article>
+        </div>
+
+        <article className="result-card live-status-card">
+          <span className="readout-label">当前任务</span>
+          <strong>{session.mission_title}</strong>
+          <p>{describeMissionFocus(session.mission_title)}</p>
+        </article>
+
+        <article className="result-card live-status-card">
+          <span className="readout-label">剩余资源</span>
+          <strong>
+            {session.frames_remaining} 帧 / {session.remaining_guesses}/{session.max_guesses} 次猜测
+          </strong>
+          <p>{`卡牌 ${session.cards_remaining}/${session.max_cards}。现在只保留判断所需的最小读数。`}</p>
+        </article>
+
+        <div className="live-status-footer">
+          <button className="secondary-button" onClick={onOpenHistory} type="button">
+            历史记录 {historyCount > 0 ? `(${historyCount})` : ""}
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="panel result-panel">
       <div className="panel-heading result-panel__hero">
         <div>
           <p className="eyebrow">本局状态</p>
-          <h2>
-            {session.status === "playing"
-              ? `${session.phase_label}：判断时机比等待更重要`
-              : session.status === "won"
-                ? `识别成功：${session.revealed_target}`
-                : `识别失败：${session.revealed_target}`}
-          </h2>
+          <div className="result-title-stack">
+            <span
+              className={`result-state-chip ${
+                session.status === "won"
+                  ? "result-state-chip--won"
+                  : "result-state-chip--lost"
+              }`}
+            >
+              {session.status === "won" ? "通关成功" : "本关失败"}
+            </span>
+            <h2>{session.level_title}</h2>
+          </div>
+          <div className="result-meta-row">
+            <span className="result-meta-chip">{session.chapter_title}</span>
+            <span className="result-meta-chip">{`第 ${session.chapter}-${session.level} 关`}</span>
+          </div>
         </div>
         <div className="score-total-block">
           <span className="readout-label">当前分数</span>
@@ -49,34 +121,83 @@ export function ScorePanel({
         </div>
       </div>
 
-      <div className="result-grid result-grid--compact">
-        <article className="result-card">
-          <span className="readout-label">任务重点</span>
-          <strong>{focus}</strong>
-        </article>
-        <article className="result-card">
-          <span className="readout-label">当前局势</span>
-          <strong>{livePriority}</strong>
-        </article>
-        <article className="result-card">
-          <span className="readout-label">卡牌成本</span>
-          <strong>{summarizeToolPenalty(session)}</strong>
-        </article>
-        <article className="result-card">
-          <span className="readout-label">得分公式</span>
-          <strong>{SCORE_FORMULA_LABEL}</strong>
-        </article>
-      </div>
+      {session.status === "won" && session.awaiting_advancement ? (
+        <section className="result-section">
+          <div className="result-card result-card--action">
+            <span className="readout-label">下一关已解锁</span>
+            <strong>{session.next_level_title ?? "下一关"}</strong>
+            <p>{session.next_level_summary ?? "难度将继续提升。"}</p>
+            <div className="result-actions">
+              <button
+                className="action-button"
+                disabled={busyAction !== null}
+                onClick={onAdvance}
+                type="button"
+              >
+                {busyAction === "advance" ? "载入下一关..." : "进入下一关"}
+              </button>
+              <button
+                className="secondary-button"
+                disabled={busyAction !== null}
+                onClick={onRetryLevel}
+                type="button"
+              >
+                重试本关
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {session.status === "lost" ? (
+        <section className="result-section">
+          <div className="result-card result-card--action">
+            <span className="readout-label">失败原因</span>
+            <strong>{session.loss_reason ?? "本关失败"}</strong>
+            <p>进度不会后退。整理判断后，直接重试当前关。</p>
+            <div className="result-actions">
+              <button
+                className="action-button"
+                disabled={busyAction !== null}
+                onClick={onRetryLevel}
+                type="button"
+              >
+                {busyAction === "start" ? "重载中..." : "重试本关"}
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {session.campaign_complete ? (
+        <section className="result-section">
+          <div className="result-card result-card--action">
+            <span className="readout-label">整套完成</span>
+            <strong>12 关已全部归档</strong>
+            <p>{session.next_level_summary ?? "你可以从第一关重新挑战整套档案。"}</p>
+            <div className="result-actions">
+              <button
+                className="action-button"
+                disabled={busyAction !== null}
+                onClick={onRetryLevel}
+                type="button"
+              >
+                {busyAction === "start" ? "重载中..." : "重新开始"}
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="result-section">
         <div className="result-section__header">
           <p className="eyebrow">最近分数变化</p>
-          <strong>{isFinished ? `最近 ${latestEvents} 条` : "只看关键变化"}</strong>
+          <strong>最近 5 条</strong>
         </div>
         <ScoreEventList
           emptyLabel="这局还没有触发任何分数变化。"
           events={session.score_events}
-          limit={latestEvents}
+          limit={5}
         />
       </section>
 
@@ -91,16 +212,10 @@ export function ScorePanel({
             summary
           />
 
-          {isFinished ? (
-            <details className="result-disclosure">
-              <summary>查看完整得分账单</summary>
-              <ScoreBreakdownGrid items={breakdownItems(breakdown)} />
-            </details>
-          ) : null}
-
-          {session.loss_reason ? (
-            <p className="result-note">失败原因：{session.loss_reason}</p>
-          ) : null}
+          <details className="result-disclosure">
+            <summary>查看完整得分账单</summary>
+            <ScoreBreakdownGrid items={breakdownItems(breakdown)} />
+          </details>
         </section>
       ) : null}
 
@@ -113,15 +228,8 @@ export function ScorePanel({
           <button className="secondary-button" onClick={onOpenHistory} type="button">
             打开历史抽屉
           </button>
-          <span className="result-note">
-            支持搜索目标、筛选胜负，并按时间或分数排序。
-          </span>
         </div>
       </section>
-
-      <p className="result-note">
-        猜错会 -18 分并抬高风险；猜测用尽、稳定归零、污染爆表或帧耗尽都会直接结束本局。
-      </p>
     </section>
   );
 }

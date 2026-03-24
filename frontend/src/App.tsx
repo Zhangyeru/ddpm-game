@@ -16,11 +16,14 @@ export default function App() {
     controlsDisabled,
     error,
     pendingAction,
+    progression,
+    progressionLoading,
     selectedGuess,
     session,
     history,
     setSelectedGuess,
     applyCard,
+    advanceToNextLevel,
     startRound,
     submitSelectedGuess,
     retryLastAction,
@@ -36,6 +39,7 @@ export default function App() {
         onStart={() => {
           void startRound();
         }}
+        progression={progression}
         session={session}
       />
 
@@ -50,11 +54,12 @@ export default function App() {
         />
       ) : null}
 
-      {!session && pendingAction === "start" ? (
+      {!session && (pendingAction === "start" || progressionLoading) ? (
         <LoadingRoundShell />
       ) : !session ? (
         <LandingGuide
           busy={pendingAction === "start"}
+          progression={progression}
           onStart={() => {
             void startRound();
           }}
@@ -63,8 +68,16 @@ export default function App() {
         <main className="console-grid">
           <div className="console-stack console-stack--left">
             <ScorePanel
+              busyAction={pendingAction}
               historyCount={history.length}
+              onAdvance={() => {
+                void advanceToNextLevel();
+              }}
               onOpenHistory={() => setHistoryOpen(true)}
+              onRetryLevel={() => {
+                void startRound();
+              }}
+              progression={progression}
               session={session}
             />
           </div>

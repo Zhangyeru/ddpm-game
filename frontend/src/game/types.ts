@@ -4,7 +4,13 @@ export type CardId =
   | "bio-scan";
 
 export type GameStatus = "playing" | "won" | "lost";
-export type PendingActionKind = "start" | "step" | "guess" | "card";
+export type PendingActionKind =
+  | "advance"
+  | "progression"
+  | "start"
+  | "step"
+  | "guess"
+  | "card";
 export type ScoreEventKind =
   | "card"
   | "guess_penalty"
@@ -38,10 +44,41 @@ export interface ScoreEvent {
   detail: string;
 }
 
-export interface SessionSnapshot {
-  session_id: string;
+export interface LevelProgressItem {
+  level_id: string;
   chapter: number;
   level: number;
+  chapter_title: string;
+  level_title: string;
+  mission_title: string;
+  summary: string;
+  max_guesses: number;
+  max_cards: number;
+  candidate_count: number;
+  is_current: boolean;
+  is_completed: boolean;
+  is_unlocked: boolean;
+}
+
+export interface ProgressSnapshot {
+  current_level_id: string;
+  highest_unlocked_level_id: string;
+  completed_level_ids: string[];
+  completed_count: number;
+  total_levels: number;
+  campaign_complete: boolean;
+  current_level: LevelProgressItem;
+  levels: LevelProgressItem[];
+}
+
+export interface SessionSnapshot {
+  session_id: string;
+  level_id: string;
+  chapter: number;
+  level: number;
+  chapter_title: string;
+  level_title: string;
+  level_summary: string;
   score: number;
   combo: number;
   status: GameStatus;
@@ -55,7 +92,9 @@ export interface SessionSnapshot {
   image_url: string;
   candidate_labels: string[];
   remaining_guesses: number;
+  max_guesses: number;
   cards_remaining: number;
+  max_cards: number;
   hint: string;
   events: string[];
   card_options: CardOption[];
@@ -69,6 +108,11 @@ export interface SessionSnapshot {
   score_events: ScoreEvent[];
   loss_reason: string | null;
   ended_at: string | null;
+  awaiting_advancement: boolean;
+  next_level_id: string | null;
+  next_level_title: string | null;
+  next_level_summary: string | null;
+  campaign_complete: boolean;
 }
 
 export interface ScoreHistoryEntry {
@@ -76,6 +120,11 @@ export interface ScoreHistoryEntry {
   session_id: string;
   ended_at: string;
   status: Exclude<GameStatus, "playing">;
+  level_id: string;
+  chapter: number;
+  level: number;
+  chapter_title: string;
+  level_title: string;
   revealed_target: string | null;
   mission_title: string;
   final_score: number;

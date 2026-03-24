@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from .schemas import GuessRequest, SessionSnapshot, UseCardRequest
+from .schemas import GuessRequest, ProgressSnapshot, SessionSnapshot, UseCardRequest
 from .service import GameService
 from .settings import load_settings
 from .trajectory_store import TrajectoryStore
@@ -41,7 +41,19 @@ def healthcheck() -> dict[str, str]:
 
 @app.post("/api/session/start", response_model=SessionSnapshot)
 def start_session(player_id: str | None = Header(default=None, alias="X-Player-Id")) -> SessionSnapshot:
-    return service.start_session(player_id)
+    return service.start_current_level(player_id)
+
+
+@app.post("/api/session/start-current-level", response_model=SessionSnapshot)
+def start_current_level(
+    player_id: str | None = Header(default=None, alias="X-Player-Id"),
+) -> SessionSnapshot:
+    return service.start_current_level(player_id)
+
+
+@app.get("/api/progression", response_model=ProgressSnapshot)
+def get_progression(player_id: str | None = Header(default=None, alias="X-Player-Id")) -> ProgressSnapshot:
+    return service.get_progression(player_id)
 
 
 @app.post("/api/session/{session_id}/step", response_model=SessionSnapshot)
@@ -77,6 +89,19 @@ def use_card(
 ) -> SessionSnapshot:
     try:
         return service.use_card(player_id, session_id, payload.card_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.post("/api/session/{session_id}/advance", response_model=SessionSnapshot)
+def advance_session(
+    session_id: str,
+    player_id: str | None = Header(default=None, alias="X-Player-Id"),
+) -> SessionSnapshot:
+    try:
+        return service.advance(player_id, session_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:

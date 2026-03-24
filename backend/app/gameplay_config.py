@@ -28,9 +28,31 @@ class InitialSessionConfig:
 
 
 @dataclass(frozen=True)
-class RoundStructureConfig:
-    max_chapters: int = 3
-    levels_per_chapter: int = 8
+class CampaignStructureConfig:
+    chapters: int = 4
+    levels_per_chapter: int = 3
+
+
+@dataclass(frozen=True)
+class LevelDefinition:
+    level_id: str
+    chapter: int
+    chapter_title: str
+    level: int
+    level_title: str
+    summary: str
+    mission_type: MissionType
+    candidate_count: int
+    max_guesses: int
+    max_cards: int
+    initial_stability: int
+    initial_corruption: int
+    risk_multiplier: float
+    target_pool: tuple[str, ...]
+
+    @property
+    def mission_title(self) -> str:
+        return mission_definition(self.mission_type).title
 
 
 @dataclass(frozen=True)
@@ -91,7 +113,7 @@ class PresentationTuning:
 class GameConfig:
     initial_session: InitialSessionConfig = InitialSessionConfig()
     resources: ResourceConfig = ResourceConfig()
-    rounds: RoundStructureConfig = RoundStructureConfig()
+    campaign: CampaignStructureConfig = CampaignStructureConfig()
     actions: ActionTuning = ActionTuning()
     scoring: ScoreTuning = ScoreTuning()
     presentation: PresentationTuning = PresentationTuning()
@@ -99,26 +121,234 @@ class GameConfig:
 
 GAME_CONFIG = GameConfig()
 
-MISSION_CYCLE: tuple[MissionDefinition, ...] = (
-    MissionDefinition("speed", "速判回收：越早识别，奖励越高"),
-    MissionDefinition("stability", "稳态回收：保持稳定度，吃满保底收益"),
-    MissionDefinition("precision", "低干预回收：少用卡牌，分数更优"),
+MISSION_LIBRARY: dict[MissionType, MissionDefinition] = {
+    "speed": MissionDefinition("speed", "速判回收：越早识别，奖励越高"),
+    "stability": MissionDefinition("stability", "稳态回收：保持稳定度，吃满保底收益"),
+    "precision": MissionDefinition("precision", "低干预回收：少用卡牌，分数更优"),
+}
+
+LEVEL_DEFINITIONS: tuple[LevelDefinition, ...] = (
+    LevelDefinition(
+        level_id="chapter-1-level-1",
+        chapter=1,
+        chapter_title="第一章：校准档案",
+        level=1,
+        level_title="家养轮廓",
+        summary="4 项候选，资源宽松，适合先熟悉判断节奏。",
+        mission_type="speed",
+        candidate_count=4,
+        max_guesses=3,
+        max_cards=2,
+        initial_stability=90,
+        initial_corruption=8,
+        risk_multiplier=0.82,
+        target_pool=("猫", "狗", "自行车", "摩托车"),
+    ),
+    LevelDefinition(
+        level_id="chapter-1-level-2",
+        chapter=1,
+        chapter_title="第一章：校准档案",
+        level=2,
+        level_title="轮廓分家",
+        summary="候选增到 5 项，开始要求先分清生物和机械。",
+        mission_type="stability",
+        candidate_count=5,
+        max_guesses=3,
+        max_cards=2,
+        initial_stability=88,
+        initial_corruption=10,
+        risk_multiplier=0.88,
+        target_pool=("猫", "狗", "马", "自行车", "摩托车"),
+    ),
+    LevelDefinition(
+        level_id="chapter-1-level-3",
+        chapter=1,
+        chapter_title="第一章：校准档案",
+        level=3,
+        level_title="保留干预",
+        summary="仍有 2 张卡，但这关开始强调少出卡也能拿高分。",
+        mission_type="precision",
+        candidate_count=5,
+        max_guesses=3,
+        max_cards=2,
+        initial_stability=86,
+        initial_corruption=12,
+        risk_multiplier=0.94,
+        target_pool=("猫", "狗", "马", "自行车", "摩托车", "火车"),
+    ),
+    LevelDefinition(
+        level_id="chapter-2-level-1",
+        chapter=2,
+        chapter_title="第二章：城市残响",
+        level=1,
+        level_title="双家族混流",
+        summary="6 项候选，轮廓更杂，需要更早确认大类。",
+        mission_type="speed",
+        candidate_count=6,
+        max_guesses=3,
+        max_cards=2,
+        initial_stability=82,
+        initial_corruption=16,
+        risk_multiplier=1.0,
+        target_pool=("猫", "狗", "马", "鹰", "自行车", "摩托车"),
+    ),
+    LevelDefinition(
+        level_id="chapter-2-level-2",
+        chapter=2,
+        chapter_title="第二章：城市残响",
+        level=2,
+        level_title="结构侵入",
+        summary="把建筑目标混入候选，稳态判断开始更重要。",
+        mission_type="stability",
+        candidate_count=6,
+        max_guesses=3,
+        max_cards=2,
+        initial_stability=80,
+        initial_corruption=18,
+        risk_multiplier=1.05,
+        target_pool=("马", "鹰", "摩托车", "火车", "城堡", "灯塔"),
+    ),
+    LevelDefinition(
+        level_id="chapter-2-level-3",
+        chapter=2,
+        chapter_title="第二章：城市残响",
+        level=3,
+        level_title="单卡执行",
+        summary="首次只给 1 张卡，要求把主动干预留到最关键时刻。",
+        mission_type="precision",
+        candidate_count=6,
+        max_guesses=3,
+        max_cards=1,
+        initial_stability=80,
+        initial_corruption=18,
+        risk_multiplier=1.08,
+        target_pool=("猫", "鹰", "自行车", "摩托车", "城堡", "灯塔"),
+    ),
+    LevelDefinition(
+        level_id="chapter-3-level-1",
+        chapter=3,
+        chapter_title="第三章：高压回路",
+        level=1,
+        level_title="快判窗口",
+        summary="只剩 2 次猜测，错一次就会很伤。",
+        mission_type="speed",
+        candidate_count=6,
+        max_guesses=2,
+        max_cards=2,
+        initial_stability=78,
+        initial_corruption=20,
+        risk_multiplier=1.12,
+        target_pool=("狗", "马", "鹰", "火车", "飞机", "灯塔"),
+    ),
+    LevelDefinition(
+        level_id="chapter-3-level-2",
+        chapter=3,
+        chapter_title="第三章：高压回路",
+        level=2,
+        level_title="稳态压测",
+        summary="7 项候选，开局更脏，稳定线会被更快拉低。",
+        mission_type="stability",
+        candidate_count=7,
+        max_guesses=2,
+        max_cards=2,
+        initial_stability=76,
+        initial_corruption=24,
+        risk_multiplier=1.16,
+        target_pool=("猫", "狗", "马", "鹰", "摩托车", "火车", "城堡"),
+    ),
+    LevelDefinition(
+        level_id="chapter-3-level-3",
+        chapter=3,
+        chapter_title="第三章：高压回路",
+        level=3,
+        level_title="低干预审查",
+        summary="7 项候选，只给 1 张卡，同时保留 2 次猜测。",
+        mission_type="precision",
+        candidate_count=7,
+        max_guesses=2,
+        max_cards=1,
+        initial_stability=74,
+        initial_corruption=26,
+        risk_multiplier=1.18,
+        target_pool=("猫", "马", "鹰", "自行车", "火车", "飞机", "城堡"),
+    ),
+    LevelDefinition(
+        level_id="chapter-4-level-1",
+        chapter=4,
+        chapter_title="第四章：终端审判",
+        level=1,
+        level_title="高速残影",
+        summary="终章开始，资源继续收紧，等待本身就是代价。",
+        mission_type="speed",
+        candidate_count=7,
+        max_guesses=2,
+        max_cards=1,
+        initial_stability=70,
+        initial_corruption=30,
+        risk_multiplier=1.22,
+        target_pool=("狗", "鹰", "摩托车", "自行车", "火车", "飞机", "灯塔"),
+    ),
+    LevelDefinition(
+        level_id="chapter-4-level-2",
+        chapter=4,
+        chapter_title="第四章：终端审判",
+        level=2,
+        level_title="高污染残存",
+        summary="污染开局更高，错卡和拖延都会更快把画面推向失真。",
+        mission_type="stability",
+        candidate_count=7,
+        max_guesses=2,
+        max_cards=1,
+        initial_stability=68,
+        initial_corruption=34,
+        risk_multiplier=1.26,
+        target_pool=("猫", "马", "摩托车", "火车", "飞机", "城堡", "灯塔"),
+    ),
+    LevelDefinition(
+        level_id="chapter-4-level-3",
+        chapter=4,
+        chapter_title="第四章：终端审判",
+        level=3,
+        level_title="最终归档",
+        summary="8 项候选、1 张卡、2 次猜测，是整套关卡的最终考核。",
+        mission_type="precision",
+        candidate_count=8,
+        max_guesses=2,
+        max_cards=1,
+        initial_stability=66,
+        initial_corruption=36,
+        risk_multiplier=1.32,
+        target_pool=("猫", "狗", "马", "鹰", "摩托车", "火车", "城堡", "灯塔", "飞机"),
+    ),
 )
 
-
-def chapter_and_level_for_round(round_index: int) -> tuple[int, int]:
-    round_offset = max(0, round_index - 1)
-    chapter = min(
-        GAME_CONFIG.rounds.max_chapters,
-        (round_offset // GAME_CONFIG.rounds.levels_per_chapter) + 1,
-    )
-    level = (round_offset % GAME_CONFIG.rounds.levels_per_chapter) + 1
-    return chapter, level
+_LEVELS_BY_ID = {level.level_id: level for level in LEVEL_DEFINITIONS}
 
 
-def mission_for_round(round_index: int) -> MissionDefinition:
-    round_offset = max(0, round_index - 1)
-    return MISSION_CYCLE[round_offset % len(MISSION_CYCLE)]
+def mission_definition(mission_type: MissionType) -> MissionDefinition:
+    return MISSION_LIBRARY[mission_type]
+
+
+def first_level() -> LevelDefinition:
+    return LEVEL_DEFINITIONS[0]
+
+
+def all_levels() -> tuple[LevelDefinition, ...]:
+    return LEVEL_DEFINITIONS
+
+
+def level_by_id(level_id: str) -> LevelDefinition:
+    return _LEVELS_BY_ID[level_id]
+
+
+def next_level(level_id: str) -> LevelDefinition | None:
+    for index, definition in enumerate(LEVEL_DEFINITIONS):
+        if definition.level_id != level_id:
+            continue
+        if index + 1 >= len(LEVEL_DEFINITIONS):
+            return None
+        return LEVEL_DEFINITIONS[index + 1]
+    raise KeyError(level_id)
 
 
 def mission_bonus(
@@ -146,6 +376,7 @@ def calculate_win_score(
     stability: int,
     corruption: int,
     cards_remaining: int,
+    max_cards_total: int | None = None,
 ) -> int:
     return calculate_score_breakdown(
         mission_type,
@@ -155,6 +386,7 @@ def calculate_win_score(
         stability=stability,
         corruption=corruption,
         cards_remaining=cards_remaining,
+        max_cards_total=max_cards_total,
     ).settlement_score
 
 
@@ -168,6 +400,7 @@ def calculate_score_breakdown(
     corruption: int,
     cards_remaining: int,
     process_score_total: int = 0,
+    max_cards_total: int | None = None,
 ) -> ScoreBreakdownData:
     early_bonus = int((1 - progress) * GAME_CONFIG.scoring.early_bonus_max)
     time_bonus = calculate_time_bonus(frames_remaining=frames_remaining, total_frames=total_frames)
@@ -177,9 +410,8 @@ def calculate_score_breakdown(
         GAME_CONFIG.scoring.corruption_bonus_base
         - (corruption // GAME_CONFIG.scoring.corruption_bonus_divisor),
     )
-    card_penalty = (
-        (GAME_CONFIG.resources.max_cards - cards_remaining) * GAME_CONFIG.scoring.card_use_penalty
-    )
+    total_cards = GAME_CONFIG.resources.max_cards if max_cards_total is None else max_cards_total
+    card_penalty = (max(0, total_cards - cards_remaining)) * GAME_CONFIG.scoring.card_use_penalty
     mission_reward = mission_bonus(
         mission_type,
         progress=progress,
@@ -246,11 +478,11 @@ def card_effect(card_id: str, *, matched: bool) -> RiskDelta:
     return GAME_CONFIG.actions.mismatched_card
 
 
-def step_risk(total_frames: int) -> RiskDelta:
+def step_risk(total_frames: int, *, risk_multiplier: float = 1.0) -> RiskDelta:
     step_count = max(1, total_frames - 1)
     return RiskDelta(
-        stability=-(GAME_CONFIG.actions.step_round_stability_loss / step_count),
-        corruption=GAME_CONFIG.actions.step_round_corruption_gain / step_count,
+        stability=-(GAME_CONFIG.actions.step_round_stability_loss * risk_multiplier / step_count),
+        corruption=GAME_CONFIG.actions.step_round_corruption_gain * risk_multiplier / step_count,
     )
 
 
@@ -273,6 +505,25 @@ def progress_event_frames(total_frames: int) -> frozenset[int]:
 
 def high_corruption_event_frames(total_frames: int) -> frozenset[int]:
     return _milestone_frames(total_frames, GAME_CONFIG.presentation.high_corruption_event_points)
+
+
+def describe_level_transition(current: LevelDefinition, upcoming: LevelDefinition) -> str:
+    changes: list[str] = []
+    if upcoming.candidate_count != current.candidate_count:
+        changes.append(f"候选改为 {upcoming.candidate_count} 项")
+    if upcoming.max_guesses != current.max_guesses:
+        changes.append(f"猜测次数改为 {upcoming.max_guesses} 次")
+    if upcoming.max_cards != current.max_cards:
+        changes.append(f"卡牌改为 {upcoming.max_cards} 张")
+    if upcoming.initial_stability < current.initial_stability:
+        changes.append(f"初始稳定降到 {upcoming.initial_stability}")
+    if upcoming.initial_corruption > current.initial_corruption:
+        changes.append(f"初始污染升到 {upcoming.initial_corruption}")
+    if upcoming.risk_multiplier > current.risk_multiplier + 0.01:
+        changes.append("每步风险更高")
+    if not changes:
+        return upcoming.summary
+    return f"下一关：{'，'.join(changes[:4])}。"
 
 
 def _milestone_frames(total_frames: int, points: tuple[float, ...]) -> frozenset[int]:

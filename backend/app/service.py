@@ -11,34 +11,41 @@ from threading import RLock
 from typing import Callable
 
 from .frame_renderer import DEFAULT_TOTAL_FRAMES
+from .game_data import CARD_DEFINITIONS, TARGETS, TargetDefinition
 from .gameplay_config import (
     GAME_CONFIG,
+    LEVEL_DEFINITIONS,
+    LevelDefinition,
     MissionType,
     ScoreBreakdownData,
+    all_levels,
     calculate_loss_breakdown,
     calculate_score_breakdown,
     card_effect,
-    chapter_and_level_for_round,
+    describe_level_transition,
+    first_level,
     high_corruption_event_frames,
-    mission_for_round,
+    level_by_id,
+    mission_definition,
     phase_label,
     progress_event_frames,
     step_interval_ms,
     step_risk,
     threat_label,
+    next_level as resolve_next_level,
 )
-from .game_data import (
-    CARD_DEFINITIONS,
-    TARGETS,
-    TargetDefinition,
+from .schemas import (
+    CardOption,
+    LevelProgressItem,
+    ProgressSnapshot,
+    ScoreBreakdown,
+    ScoreEvent,
+    SessionSnapshot,
 )
-from .schemas import CardOption, ScoreBreakdown, ScoreEvent, SessionSnapshot
 from .trajectory_store import FrameAsset, TrajectoryStore
 
 
 SESSION_TTL_SECONDS = GAME_CONFIG.presentation.session_ttl_seconds
-MAX_GUESSES = GAME_CONFIG.resources.max_guesses
-MAX_CARDS = GAME_CONFIG.resources.max_cards
 MAX_STABILITY = GAME_CONFIG.resources.max_stability
 MAX_CORRUPTION = GAME_CONFIG.resources.max_corruption
 
@@ -49,12 +56,19 @@ class Session:
     player_id: str
     frame_secret: str
     sample_id: str
+    level_id: str
     chapter: int
     level: int
+    chapter_title: str
+    level_title: str
+    level_summary: str
     mission_type: MissionType
     mission_title: str
     target: TargetDefinition
     candidate_labels: list[str]
+    max_guesses: int
+    max_cards: int
+    risk_multiplier: float
     score: int = 0
     combo: int = 0
     status: str = "playing"
@@ -63,8 +77,8 @@ class Session:
     corruption: float = 0.0
     frame_index: int = 0
     total_frames: int = DEFAULT_TOTAL_FRAMES
-    remaining_guesses: int = MAX_GUESSES
-    cards_remaining: int = MAX_CARDS
+    remaining_guesses: int = 0
+    cards_remaining: int = 0
     hint: str = ""
     events: list[str] = field(default_factory=list)
     used_cards: list[str] = field(default_factory=list)
@@ -73,13 +87,21 @@ class Session:
     loss_reason: str | None = None
     ended_at: str | None = None
     revealed_target: str | None = None
+    awaiting_advancement: bool = False
+    next_level_id: str | None = None
+    next_level_title: str | None = None
+    next_level_summary: str | None = None
+    campaign_complete: bool = False
     last_touched_at: float = field(default_factory=time.monotonic)
 
 
 @dataclass
-class PlayerProgress:
-    rounds_started: int = 0
+class PlayerCampaignProgress:
+    current_level_id: str = field(default_factory=lambda: first_level().level_id)
+    highest_unlocked_level_id: str = field(default_factory=lambda: first_level().level_id)
+    completed_level_ids: set[str] = field(default_factory=set)
     streak: int = 0
+    campaign_complete: bool = False
 
 
 class GameService:
@@ -92,10 +114,14 @@ class GameService:
         self.trajectory_store = trajectory_store or TrajectoryStore()
         self.clock = clock or time.monotonic
         self.sessions: dict[str, Session] = {}
-        self.player_progress: dict[str, PlayerProgress] = {}
-        self.targets = tuple(
-            target for target in TARGETS if self.trajectory_store.has_target(target.label)
-        )
+        self.player_progress: dict[str, PlayerCampaignProgress] = {}
+        self.targets_by_label = {
+            target.label: target
+            for target in TARGETS
+            if self.trajectory_store.has_target(target.label)
+        }
+        self.levels = all_levels()
+        self.level_indices = {level.level_id: index for index, level in enumerate(self.levels)}
         self.card_options = tuple(
             CardOption(
                 id=card_id,
@@ -105,58 +131,43 @@ class GameService:
             for card_id, definition in CARD_DEFINITIONS.items()
         )
         self._lock = RLock()
-        if not self.targets:
-            raise ValueError("轨迹清单中没有可用目标。")
-        if len(self.targets) < 6:
+        if len(self.targets_by_label) < 6:
             raise ValueError("轨迹清单中的可用目标不足 6 个，无法生成候选列表。")
+        self._validate_level_definitions()
+
+    def get_progression(self, player_id: str | None) -> ProgressSnapshot:
+        player_key = self._normalize_player_id(player_id)
+        with self._lock:
+            progress = self._campaign_progress(player_key)
+            return self._progression_snapshot(progress)
 
     def start_session(self, player_id: str | None) -> SessionSnapshot:
+        return self.start_current_level(player_id)
+
+    def start_current_level(self, player_id: str | None) -> SessionSnapshot:
         player_key = self._normalize_player_id(player_id)
         with self._lock:
             self._prune_expired_sessions()
-            progress = self.player_progress.setdefault(player_key, PlayerProgress())
-            progress.rounds_started += 1
-
-            rng = random.Random()
-            target = rng.choice(self.targets)
-            distractors = [candidate.label for candidate in self.targets if candidate != target]
-            candidate_labels = rng.sample(distractors, k=5)
-            candidate_labels.append(target.label)
-            rng.shuffle(candidate_labels)
-
-            mission = mission_for_round(progress.rounds_started)
-            chapter, level = chapter_and_level_for_round(progress.rounds_started)
-            session_id = uuid.uuid4().hex
-            total_frames = self.trajectory_store.total_frames
-            sample_id = rng.choice(self.trajectory_store.sample_ids_for_target(target.label))
-
-            session = Session(
-                session_id=session_id,
-                player_id=player_key,
-                frame_secret=uuid.uuid4().hex,
-                sample_id=sample_id,
-                chapter=chapter,
-                level=level,
-                mission_type=mission.mission_type,
-                mission_title=mission.title,
-                target=target,
-                candidate_labels=candidate_labels,
-                combo=progress.streak,
-                frames_remaining=max(total_frames - 1, 0),
-                stability=GAME_CONFIG.initial_session.stability,
-                corruption=GAME_CONFIG.initial_session.corruption,
-                total_frames=total_frames,
-                hint=target.hint,
-                events=[
-                    "信号已锁定，遗物从原始噪声中开始显形。",
-                    f"分类提示：{target.hint}。",
-                    f"当前任务：{mission.title}。",
-                    "引导卡已装填。先判断目标家族，再决定是否出手。",
-                ],
-                last_touched_at=self.clock(),
-            )
-            self.sessions[session_id] = session
+            progress = self._campaign_progress(player_key)
+            level_definition = level_by_id(progress.current_level_id)
+            session = self._build_session(player_key, progress, level_definition)
+            self.sessions[session.session_id] = session
             return self._snapshot(session)
+
+    def advance(self, player_id: str | None, session_id: str) -> SessionSnapshot:
+        with self._lock:
+            session = self._get_session(player_id, session_id)
+            if session.status != "won":
+                raise ValueError("只有通关后的回收记录才能推进下一关。")
+            if session.awaiting_advancement is False or session.next_level_id is None:
+                raise ValueError("当前没有可推进的下一关。")
+
+            progress = self._campaign_progress(session.player_id)
+            progress.current_level_id = session.next_level_id
+            next_definition = level_by_id(session.next_level_id)
+            next_session = self._build_session(session.player_id, progress, next_definition)
+            self.sessions[next_session.session_id] = next_session
+            return self._snapshot(next_session)
 
     def step(self, player_id: str | None, session_id: str) -> SessionSnapshot:
         with self._lock:
@@ -166,7 +177,7 @@ class GameService:
 
             session.frame_index = min(session.total_frames - 1, session.frame_index + 1)
             session.frames_remaining = max(0, session.frames_remaining - 1)
-            step_delta = step_risk(session.total_frames)
+            step_delta = step_risk(session.total_frames, risk_multiplier=session.risk_multiplier)
             self._shift_risk(
                 session,
                 stability_delta=step_delta.stability,
@@ -198,16 +209,17 @@ class GameService:
                 raise ValueError("猜测必须来自当前候选列表。")
 
             if guess == session.target.label:
-                progress = session.frame_index / max(session.total_frames - 1, 1)
+                progress_ratio = session.frame_index / max(session.total_frames - 1, 1)
                 breakdown = calculate_score_breakdown(
                     session.mission_type,
-                    progress=progress,
+                    progress=progress_ratio,
                     frames_remaining=session.frames_remaining,
                     total_frames=session.total_frames,
                     stability=round(session.stability),
                     corruption=round(session.corruption),
                     cards_remaining=session.cards_remaining,
                     process_score_total=session.score,
+                    max_cards_total=session.max_cards,
                 )
                 session.score = breakdown.final_score
                 session.combo = self._record_win(session.player_id)
@@ -222,6 +234,7 @@ class GameService:
                     delta=breakdown.settlement_score,
                     detail=self._settlement_detail(breakdown),
                 )
+                self._complete_level(session)
                 self._append_event(
                     session,
                     f"识别正确，遗物确认为：{session.target.label}。",
@@ -328,6 +341,90 @@ class GameService:
                 variant_key=variant_key,
             )
 
+    def _campaign_progress(self, player_id: str | None) -> PlayerCampaignProgress:
+        player_key = self._normalize_player_id(player_id)
+        return self.player_progress.setdefault(player_key, PlayerCampaignProgress())
+
+    def _build_session(
+        self,
+        player_key: str,
+        progress: PlayerCampaignProgress,
+        level_definition: LevelDefinition,
+    ) -> Session:
+        rng = random.Random()
+        level_targets = [self.targets_by_label[label] for label in level_definition.target_pool]
+        target = rng.choice(level_targets)
+        distractor_labels = [candidate.label for candidate in level_targets if candidate != target]
+        candidate_labels = rng.sample(distractor_labels, k=level_definition.candidate_count - 1)
+        candidate_labels.append(target.label)
+        rng.shuffle(candidate_labels)
+        total_frames = self.trajectory_store.total_frames
+        sample_id = rng.choice(self.trajectory_store.sample_ids_for_target(target.label))
+
+        session_id = uuid.uuid4().hex
+        return Session(
+            session_id=session_id,
+            player_id=player_key,
+            frame_secret=uuid.uuid4().hex,
+            sample_id=sample_id,
+            level_id=level_definition.level_id,
+            chapter=level_definition.chapter,
+            level=level_definition.level,
+            chapter_title=level_definition.chapter_title,
+            level_title=level_definition.level_title,
+            level_summary=level_definition.summary,
+            mission_type=level_definition.mission_type,
+            mission_title=level_definition.mission_title,
+            target=target,
+            candidate_labels=candidate_labels,
+            max_guesses=level_definition.max_guesses,
+            max_cards=level_definition.max_cards,
+            risk_multiplier=level_definition.risk_multiplier,
+            combo=progress.streak,
+            frames_remaining=max(total_frames - 1, 0),
+            stability=level_definition.initial_stability,
+            corruption=level_definition.initial_corruption,
+            total_frames=total_frames,
+            remaining_guesses=level_definition.max_guesses,
+            cards_remaining=level_definition.max_cards,
+            hint=target.hint,
+            events=[
+                f"{level_definition.chapter_title} · 第 {level_definition.level} 关：{level_definition.level_title}。",
+                level_definition.summary,
+                f"分类提示：{target.hint}。",
+                f"当前任务：{level_definition.mission_title}。",
+            ],
+            last_touched_at=self.clock(),
+        )
+
+    def _complete_level(self, session: Session) -> None:
+        progress = self._campaign_progress(session.player_id)
+        progress.completed_level_ids.add(session.level_id)
+        current_level = level_by_id(session.level_id)
+        upcoming = resolve_next_level(session.level_id)
+        if upcoming is None:
+            progress.highest_unlocked_level_id = current_level.level_id
+            progress.current_level_id = first_level().level_id
+            progress.campaign_complete = True
+            session.awaiting_advancement = False
+            session.campaign_complete = True
+            session.next_level_id = None
+            session.next_level_title = None
+            session.next_level_summary = "已完成全部 12 关。你可以从第一关重新挑战整套档案。"
+            self._append_event(session, "终端审判完成，整套档案已归档。")
+            return
+
+        session.awaiting_advancement = True
+        session.next_level_id = upcoming.level_id
+        session.next_level_title = upcoming.level_title
+        session.next_level_summary = describe_level_transition(current_level, upcoming)
+        if self.level_indices[upcoming.level_id] > self.level_indices[progress.highest_unlocked_level_id]:
+            progress.highest_unlocked_level_id = upcoming.level_id
+        self._append_event(
+            session,
+            f"已解锁下一关：第 {upcoming.chapter}-{upcoming.level} 关 {upcoming.level_title}。",
+        )
+
     def _get_session(self, player_id: str | None, session_id: str) -> Session:
         self._prune_expired_sessions()
         player_key = self._normalize_player_id(player_id)
@@ -338,17 +435,13 @@ class GameService:
         session.last_touched_at = self.clock()
         return session
 
-    def _progress_for(self, player_id: str | None) -> PlayerProgress:
-        player_key = self._normalize_player_id(player_id)
-        return self.player_progress.setdefault(player_key, PlayerProgress())
-
     def _record_win(self, player_id: str | None) -> int:
-        progress = self._progress_for(player_id)
+        progress = self._campaign_progress(player_id)
         progress.streak += 1
         return progress.streak
 
     def _record_loss(self, player_id: str | None) -> None:
-        progress = self._progress_for(player_id)
+        progress = self._campaign_progress(player_id)
         progress.streak = 0
 
     def _append_event(self, session: Session, message: str) -> None:
@@ -411,6 +504,8 @@ class GameService:
         )
         session.ended_at = self._ended_at_iso()
         session.revealed_target = session.target.label
+        session.awaiting_advancement = False
+        session.campaign_complete = False
         self._append_score_event(
             session,
             kind="loss",
@@ -430,6 +525,48 @@ class GameService:
             return "局部细节正在显影，错误决策会明显拉高污染度。"
         return "终局判断阶段已到来，越稳妥分数越低，越冒险收益越高。"
 
+    def _progression_snapshot(self, progress: PlayerCampaignProgress) -> ProgressSnapshot:
+        items = [self._level_progress_item(level, progress) for level in self.levels]
+        current_item = next(
+            item for item in items if item.level_id == progress.current_level_id
+        )
+        return ProgressSnapshot(
+            current_level_id=progress.current_level_id,
+            highest_unlocked_level_id=progress.highest_unlocked_level_id,
+            completed_level_ids=sorted(
+                progress.completed_level_ids,
+                key=lambda level_id: self.level_indices[level_id],
+            ),
+            completed_count=len(progress.completed_level_ids),
+            total_levels=len(self.levels),
+            campaign_complete=progress.campaign_complete,
+            current_level=current_item,
+            levels=items,
+        )
+
+    def _level_progress_item(
+        self,
+        level_definition: LevelDefinition,
+        progress: PlayerCampaignProgress,
+    ) -> LevelProgressItem:
+        highest_index = self.level_indices[progress.highest_unlocked_level_id]
+        level_index = self.level_indices[level_definition.level_id]
+        return LevelProgressItem(
+            level_id=level_definition.level_id,
+            chapter=level_definition.chapter,
+            level=level_definition.level,
+            chapter_title=level_definition.chapter_title,
+            level_title=level_definition.level_title,
+            mission_title=level_definition.mission_title,
+            summary=level_definition.summary,
+            max_guesses=level_definition.max_guesses,
+            max_cards=level_definition.max_cards,
+            candidate_count=level_definition.candidate_count,
+            is_current=level_definition.level_id == progress.current_level_id,
+            is_completed=level_definition.level_id in progress.completed_level_ids,
+            is_unlocked=level_index <= highest_index,
+        )
+
     def _snapshot(self, session: Session) -> SessionSnapshot:
         progress = session.frame_index / max(session.total_frames - 1, 1)
         variant_key = self._resolve_variant_key(session)
@@ -438,8 +575,12 @@ class GameService:
         interval_ms = step_interval_ms(session.total_frames)
         return SessionSnapshot(
             session_id=session.session_id,
+            level_id=session.level_id,
             chapter=session.chapter,
             level=session.level,
+            chapter_title=session.chapter_title,
+            level_title=session.level_title,
+            level_summary=session.level_summary,
             score=session.score,
             combo=session.combo,
             status=session.status,
@@ -453,7 +594,9 @@ class GameService:
             image_url=self._frame_url(session, session.frame_index, variant_key),
             candidate_labels=session.candidate_labels,
             remaining_guesses=session.remaining_guesses,
+            max_guesses=session.max_guesses,
             cards_remaining=session.cards_remaining,
+            max_cards=session.max_cards,
             hint=session.hint,
             events=session.events,
             card_options=list(self.card_options),
@@ -467,6 +610,11 @@ class GameService:
             score_events=session.score_events,
             loss_reason=session.loss_reason,
             ended_at=session.ended_at,
+            awaiting_advancement=session.awaiting_advancement,
+            next_level_id=session.next_level_id,
+            next_level_title=session.next_level_title,
+            next_level_summary=session.next_level_summary,
+            campaign_complete=session.campaign_complete,
         )
 
     def _score_breakdown_model(self, breakdown: ScoreBreakdownData) -> ScoreBreakdown:
@@ -581,3 +729,21 @@ class GameService:
         if not normalized:
             return "anonymous"
         return normalized[:64]
+
+    def _validate_level_definitions(self) -> None:
+        if len(self.levels) != GAME_CONFIG.campaign.chapters * GAME_CONFIG.campaign.levels_per_chapter:
+            raise ValueError("关卡配置数量与章节结构不一致。")
+
+        for level_definition in LEVEL_DEFINITIONS:
+            if level_definition.level_id not in self.level_indices:
+                raise ValueError(f"未知关卡标识：{level_definition.level_id}")
+            if len(level_definition.target_pool) < level_definition.candidate_count:
+                raise ValueError(f"{level_definition.level_id} 的目标池不足以生成候选列表。")
+            missing_labels = [
+                label for label in level_definition.target_pool if label not in self.targets_by_label
+            ]
+            if missing_labels:
+                missing = "、".join(missing_labels)
+                raise ValueError(f"{level_definition.level_id} 缺少目标素材：{missing}")
+            if level_definition.max_guesses <= 0 or level_definition.max_cards <= 0:
+                raise ValueError(f"{level_definition.level_id} 的资源配置无效。")

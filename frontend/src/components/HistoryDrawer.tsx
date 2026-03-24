@@ -47,7 +47,7 @@ export function HistoryDrawer({
       const matchesSearch =
         normalizedSearch.length === 0
           ? true
-          : `${entry.revealed_target ?? ""} ${entry.mission_title}`
+          : `${entry.revealed_target ?? ""} ${entry.mission_title} ${entry.chapter_title ?? ""} ${entry.level_title ?? ""}`
               .toLowerCase()
               .includes(normalizedSearch);
       return matchesStatus && matchesSearch;
@@ -74,7 +74,7 @@ export function HistoryDrawer({
           <input
             className="field__input"
             onChange={(event) => setSearchValue(event.target.value)}
-            placeholder="例如：猫、速判回收"
+            placeholder="例如：猫、第二章、终端审判"
             type="search"
             value={searchValue}
           />
@@ -162,7 +162,7 @@ export function HistoryDrawer({
                     {entry.revealed_target ?? "未知目标"}
                   </strong>
                   <span>
-                    {entry.mission_title} · {formatEndedAt(entry.ended_at)}
+                    {`${entry.chapter && entry.level ? `第 ${entry.chapter}-${entry.level} 关 ` : ""}${entry.level_title || "未知关卡"} · ${entry.mission_title} · ${formatEndedAt(entry.ended_at)}`}
                   </span>
                 </div>
                 <span

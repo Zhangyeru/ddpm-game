@@ -9,9 +9,8 @@ from backend.app.gameplay_config import (
     GAME_CONFIG,
     calculate_loss_breakdown,
     calculate_score_breakdown,
-    calculate_win_score,
-    chapter_and_level_for_round,
-    mission_for_round,
+    first_level,
+    level_by_id,
 )
 from backend.app.service import GameService, SESSION_TTL_SECONDS
 from backend.app.trajectory_store import TrajectoryStore
@@ -48,16 +47,28 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(snapshot.frames_remaining, session.frames_remaining)
         self.assertGreater(snapshot.seconds_remaining, 0)
 
-    def test_start_session_uses_round_configuration(self) -> None:
+    def test_start_session_uses_current_level_configuration(self) -> None:
         snapshot = self.service.start_session("player-a")
-        mission = mission_for_round(1)
-        chapter, level = chapter_and_level_for_round(1)
+        level = first_level()
 
-        self.assertEqual(snapshot.chapter, chapter)
-        self.assertEqual(snapshot.level, level)
-        self.assertEqual(snapshot.mission_title, mission.title)
-        self.assertEqual(snapshot.stability, GAME_CONFIG.initial_session.stability)
-        self.assertEqual(snapshot.corruption, GAME_CONFIG.initial_session.corruption)
+        self.assertEqual(snapshot.level_id, level.level_id)
+        self.assertEqual(snapshot.chapter_title, level.chapter_title)
+        self.assertEqual(snapshot.level_title, level.level_title)
+        self.assertEqual(snapshot.level_summary, level.summary)
+        self.assertEqual(snapshot.mission_title, level.mission_title)
+        self.assertEqual(snapshot.stability, level.initial_stability)
+        self.assertEqual(snapshot.corruption, level.initial_corruption)
+        self.assertEqual(snapshot.remaining_guesses, level.max_guesses)
+        self.assertEqual(snapshot.cards_remaining, level.max_cards)
+
+    def test_progression_defaults_to_first_level(self) -> None:
+        progression = self.service.get_progression("player-a")
+
+        self.assertEqual(progression.current_level_id, "chapter-1-level-1")
+        self.assertEqual(progression.highest_unlocked_level_id, "chapter-1-level-1")
+        self.assertEqual(progression.completed_count, 0)
+        self.assertFalse(progression.campaign_complete)
+        self.assertTrue(progression.current_level.is_current)
 
     def test_render_frame_returns_offline_manifest_asset(self) -> None:
         snapshot = self.service.start_session("player-a")
@@ -110,6 +121,7 @@ class GameServiceTest(unittest.TestCase):
             stability=snapshot.stability,
             corruption=snapshot.corruption,
             cards_remaining=snapshot.cards_remaining,
+            max_cards_total=session.max_cards,
             process_score_total=0,
         )
         self.assertEqual(result.score, expected_breakdown.final_score)
@@ -119,7 +131,40 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(result.score_breakdown.settlement_score, expected_breakdown.settlement_score)
         self.assertEqual(result.score_events[-1].kind, "settlement")
         self.assertEqual(result.score_events[-1].delta, expected_breakdown.settlement_score)
+        self.assertTrue(result.awaiting_advancement)
+        self.assertEqual(result.next_level_id, "chapter-1-level-2")
         self.assertIsNotNone(result.ended_at)
+
+    def test_advance_unlocks_and_starts_next_level(self) -> None:
+        snapshot = self.service.start_session("player-a")
+        session = self.service.sessions[snapshot.session_id]
+        won = self.service.guess("player-a", snapshot.session_id, session.target.label)
+
+        next_session = self.service.advance("player-a", won.session_id)
+        progression = self.service.get_progression("player-a")
+
+        self.assertEqual(next_session.level_id, "chapter-1-level-2")
+        self.assertEqual(next_session.status, "playing")
+        self.assertEqual(progression.current_level_id, "chapter-1-level-2")
+        self.assertEqual(progression.highest_unlocked_level_id, "chapter-1-level-2")
+        self.assertIn("chapter-1-level-1", progression.completed_level_ids)
+
+    def test_loss_does_not_advance_level(self) -> None:
+        snapshot = self.service.start_session("player-a")
+        session = self.service.sessions[snapshot.session_id]
+        wrong_label = next(
+            label for label in snapshot.candidate_labels if label != session.target.label
+        )
+
+        for _ in range(session.max_guesses):
+            result = self.service.guess("player-a", snapshot.session_id, wrong_label)
+
+        progression = self.service.get_progression("player-a")
+
+        self.assertEqual(result.status, "lost")
+        self.assertEqual(progression.current_level_id, "chapter-1-level-1")
+        self.assertEqual(progression.highest_unlocked_level_id, "chapter-1-level-1")
+        self.assertEqual(progression.completed_count, 0)
 
     def test_card_usage_appends_score_event(self) -> None:
         snapshot = self.service.start_session("player-a")
@@ -154,10 +199,10 @@ class GameServiceTest(unittest.TestCase):
             label for label in snapshot.candidate_labels if label != session.target.label
         )
 
-        for _ in range(GAME_CONFIG.resources.max_guesses):
+        for _ in range(session.max_guesses):
             result = self.service.guess("player-a", snapshot.session_id, wrong_label)
 
-        expected_process_score = GAME_CONFIG.actions.wrong_guess.score * GAME_CONFIG.resources.max_guesses
+        expected_process_score = GAME_CONFIG.actions.wrong_guess.score * session.max_guesses
         expected_breakdown = calculate_loss_breakdown(process_score_total=expected_process_score)
 
         self.assertEqual(result.status, "lost")
@@ -166,6 +211,7 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(result.score_breakdown.final_score, expected_breakdown.final_score)
         self.assertEqual(result.score_events[-1].kind, "loss")
         self.assertEqual(result.score_events[-1].delta, 0)
+        self.assertFalse(result.awaiting_advancement)
         self.assertIsNotNone(result.ended_at)
 
     def test_sample_selection_stays_stable_within_session(self) -> None:
@@ -177,6 +223,39 @@ class GameServiceTest(unittest.TestCase):
         self.service.use_card("player-a", snapshot.session_id, "sharpen-outline")
 
         self.assertEqual(self.service.sessions[snapshot.session_id].sample_id, initial_sample_id)
+
+    def test_final_level_win_marks_campaign_complete(self) -> None:
+        progress = self.service._campaign_progress("player-a")
+        progress.current_level_id = "chapter-4-level-3"
+        progress.highest_unlocked_level_id = "chapter-4-level-3"
+        progress.completed_level_ids = {
+            level.level_id for level in map(level_by_id, [
+                "chapter-1-level-1",
+                "chapter-1-level-2",
+                "chapter-1-level-3",
+                "chapter-2-level-1",
+                "chapter-2-level-2",
+                "chapter-2-level-3",
+                "chapter-3-level-1",
+                "chapter-3-level-2",
+                "chapter-3-level-3",
+                "chapter-4-level-1",
+                "chapter-4-level-2",
+            ])
+        }
+        snapshot = self.service.start_current_level("player-a")
+        session = self.service.sessions[snapshot.session_id]
+
+        result = self.service.guess("player-a", snapshot.session_id, session.target.label)
+        progression = self.service.get_progression("player-a")
+
+        self.assertEqual(result.status, "won")
+        self.assertTrue(result.campaign_complete)
+        self.assertFalse(result.awaiting_advancement)
+        self.assertIsNone(result.next_level_id)
+        self.assertTrue(progression.campaign_complete)
+        self.assertEqual(progression.current_level_id, "chapter-1-level-1")
+        self.assertEqual(progression.completed_count, 12)
 
 
 class TrajectoryStoreTest(unittest.TestCase):

@@ -1,10 +1,15 @@
-import type { PendingActionKind, SessionSnapshot } from "../game/types";
+import type {
+  PendingActionKind,
+  ProgressSnapshot,
+  SessionSnapshot
+} from "../game/types";
 import { describeLivePriority } from "../content/gameGuide";
 
 type StatusBarProps = {
   busyAction: PendingActionKind | null;
   historyCount: number;
   onOpenHistory: () => void;
+  progression: ProgressSnapshot | null;
   session: SessionSnapshot | null;
   onStart: () => void;
 };
@@ -13,9 +18,11 @@ export function StatusBar({
   busyAction,
   historyCount,
   onOpenHistory,
+  progression,
   session,
   onStart
 }: StatusBarProps) {
+  const progressLevel = progression?.current_level ?? null;
   const statusKey = session?.status ?? "idle";
   const statusLabel = session
     ? session.status === "playing"
@@ -23,10 +30,24 @@ export function StatusBar({
       : session.status === "won"
         ? "已识别"
         : "失败"
-    : "待机";
+    : progression?.campaign_complete
+      ? "已通关"
+      : "待机";
   const leadCopy = session
     ? describeLivePriority(session)
-    : "观察图像、谨慎出卡、尽早提交。完整规则保留在首页。";
+    : progressLevel
+      ? `${progressLevel.summary} 当前任务：${progressLevel.mission_title}。`
+      : "观察图像、谨慎出卡、尽早提交。完整规则保留在首页。";
+  const actionLabel =
+    busyAction === "start"
+      ? "载入中..."
+      : session
+        ? "重试本关"
+        : progression?.campaign_complete
+          ? "重开第一关"
+          : progression?.completed_count
+            ? "继续当前关"
+            : "开始第一关";
 
   return (
     <header className="status-bar panel">
@@ -36,43 +57,59 @@ export function StatusBar({
         <p className="subtle-copy">{leadCopy}</p>
         <div className="title-chip-row">
           <span className="title-chip">
-            {session ? session.mission_title : "完整规则页已就绪"}
+            {session
+              ? `${session.chapter_title} · ${session.level_title}`
+              : progressLevel
+                ? `${progressLevel.chapter_title} · ${progressLevel.level_title}`
+                : "12 关线性闯关"}
           </span>
           <span className="title-chip title-chip--accent">
-            {session ? session.threat_label : "准备开始"}
+            {session
+              ? session.mission_title
+              : progressLevel?.mission_title ?? "继续推进当前关卡"}
           </span>
         </div>
       </div>
 
       <div className="stats-grid">
         <div className="stat-card">
-          <span className="stat-label">章节</span>
+          <span className="stat-label">关卡</span>
           <strong className="stat-value">
-            {session ? `${session.chapter}-${session.level}` : "--"}
+            {session
+              ? `第 ${session.chapter}-${session.level} 关`
+              : progressLevel
+                ? `第 ${progressLevel.chapter}-${progressLevel.level} 关`
+                : "--"}
           </strong>
         </div>
         <div className="stat-card">
-          <span className="stat-label">时间</span>
+          <span className="stat-label">进度</span>
           <strong className="stat-value">
-            {session ? `${session.seconds_remaining.toFixed(1)} 秒` : "--"}
+            {progression
+              ? `${progression.completed_count}/${progression.total_levels}`
+              : "--"}
           </strong>
         </div>
         <div className="stat-card">
-          <span className="stat-label">分数</span>
+          <span className="stat-label">{session ? "时间" : "候选"}</span>
           <strong className="stat-value">
-            {session ? session.score : "--"}
+            {session
+              ? `${session.seconds_remaining.toFixed(1)} 秒`
+              : progressLevel
+                ? `${progressLevel.candidate_count} 项`
+                : "--"}
           </strong>
         </div>
         <div className="stat-card">
-          <span className="stat-label">稳定度</span>
+          <span className="stat-label">{session ? "分数" : "猜测"}</span>
           <strong className="stat-value">
-            {session ? session.stability : "--"}
+            {session ? session.score : progressLevel ? `${progressLevel.max_guesses} 次` : "--"}
           </strong>
         </div>
         <div className="stat-card">
-          <span className="stat-label">污染度</span>
+          <span className="stat-label">{session ? "稳定度" : "卡牌"}</span>
           <strong className="stat-value">
-            {session ? session.corruption : "--"}
+            {session ? session.stability : progressLevel ? `${progressLevel.max_cards} 张` : "--"}
           </strong>
         </div>
         <div className="stat-card">
@@ -82,9 +119,7 @@ export function StatusBar({
       </div>
 
       <div className="session-actions">
-        <span
-          className={`status-pill status-pill--${statusKey}`}
-        >
+        <span className={`status-pill status-pill--${statusKey}`}>
           {statusLabel}
         </span>
         <div className="session-action-row">
@@ -101,11 +136,7 @@ export function StatusBar({
             disabled={busyAction !== null}
             type="button"
           >
-            {busyAction === "start"
-              ? "启动中..."
-              : session
-                ? "重新开局"
-                : "启动扫描"}
+            {actionLabel}
           </button>
         </div>
       </div>

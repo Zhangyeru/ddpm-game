@@ -45,10 +45,41 @@ class ScoreEvent(BaseModel):
     detail: str
 
 
-class SessionSnapshot(BaseModel):
-    session_id: str
+class LevelProgressItem(BaseModel):
+    level_id: str
     chapter: int
     level: int
+    chapter_title: str
+    level_title: str
+    mission_title: str
+    summary: str
+    max_guesses: int
+    max_cards: int
+    candidate_count: int
+    is_current: bool
+    is_completed: bool
+    is_unlocked: bool
+
+
+class ProgressSnapshot(BaseModel):
+    current_level_id: str
+    highest_unlocked_level_id: str
+    completed_level_ids: list[str]
+    completed_count: int
+    total_levels: int
+    campaign_complete: bool
+    current_level: LevelProgressItem
+    levels: list[LevelProgressItem]
+
+
+class SessionSnapshot(BaseModel):
+    session_id: str
+    level_id: str
+    chapter: int
+    level: int
+    chapter_title: str
+    level_title: str
+    level_summary: str
     score: int
     combo: int
     status: GameStatus
@@ -62,7 +93,9 @@ class SessionSnapshot(BaseModel):
     image_url: str
     candidate_labels: list[str]
     remaining_guesses: int
+    max_guesses: int
     cards_remaining: int
+    max_cards: int
     hint: str
     events: list[str]
     card_options: list[CardOption]
@@ -76,3 +109,8 @@ class SessionSnapshot(BaseModel):
     score_events: list[ScoreEvent]
     loss_reason: str | None
     ended_at: str | None
+    awaiting_advancement: bool
+    next_level_id: str | None
+    next_level_title: str | None
+    next_level_summary: str | None
+    campaign_complete: bool

@@ -1,5 +1,6 @@
 import type {
   CardId,
+  ProgressSnapshot,
   SessionSnapshot
 } from "../game/types";
 
@@ -60,6 +61,16 @@ export function startSession(): Promise<SessionSnapshot> {
   });
 }
 
+export function getProgression(): Promise<ProgressSnapshot> {
+  return request<ProgressSnapshot>("/progression");
+}
+
+export function startCurrentLevel(): Promise<SessionSnapshot> {
+  return request<SessionSnapshot>("/session/start-current-level", {
+    method: "POST"
+  });
+}
+
 export function stepSession(
   sessionId: string
 ): Promise<SessionSnapshot> {
@@ -85,6 +96,14 @@ export function useCard(
   return request<SessionSnapshot>(`/session/${sessionId}/use-card`, {
     method: "POST",
     body: JSON.stringify({ card_id: cardId })
+  });
+}
+
+export function advanceLevel(
+  sessionId: string
+): Promise<SessionSnapshot> {
+  return request<SessionSnapshot>(`/session/${sessionId}/advance`, {
+    method: "POST"
   });
 }
 

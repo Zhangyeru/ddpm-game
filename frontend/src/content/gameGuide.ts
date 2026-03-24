@@ -22,12 +22,12 @@ export const PLAY_RULES: readonly GuideCard[] = [
   },
   {
     title: "卡牌是唯一主动工具",
-    detail: "每局只有 2 张卡。用对能稳住画面，用错会把轨迹带偏。",
+    detail: "卡牌数量由关卡决定。用对能稳住画面，用错会把轨迹带偏。",
     note: "先判断目标家族，再决定是否出高价值卡。"
   },
   {
     title: "猜错代价直接生效",
-    detail: "每局只有 3 次猜测。猜错一次会 -18 分、稳定 -12、污染 +14。",
+    detail: "猜测次数由关卡决定。猜错一次会 -18 分、稳定 -12、污染 +14。",
     note: "错误提交既丢分，也会让后面的画面更难判断。"
   },
   {
@@ -90,13 +90,13 @@ export const CARD_TOOL_GUIDE: Record<
   },
   "mechanical-lens": {
     title: "机械透镜",
-    effect: "命中机械/建筑时：稳定 +7、污染 -6、得分 +14。",
-    cost: "用错会稳定 -5、污染 +8，并把轨迹推向误导方向。",
-    timing: "看出车辆、结构体、金属轮廓后再用。"
+    effect: "命中机械/建筑：稳定 +7、污染 -6、得分 +14。",
+    cost: "用错会稳定 -5、污染 +8，并推向误导轨迹。",
+    timing: "看出车辆、结构体或金属轮廓后再用。"
   },
   "bio-scan": {
     title: "生物扫描",
-    effect: "命中生物时：稳定 +7、污染 -6、得分 +14。",
+    effect: "命中生物：稳定 +7、污染 -6、得分 +14。",
     cost: "用错会稳定 -5、污染 +8，并提高误判风险。",
     timing: "看出耳朵、羽翼、肢体等生物轮廓后再用。"
   }
@@ -113,8 +113,8 @@ export function describeMissionFocus(missionTitle: string): string {
 }
 
 export function summarizeToolPenalty(session: SessionSnapshot): string {
-  const usedCards = RESOURCE_LIMITS.cards - session.cards_remaining;
-  return `已用卡牌 ${usedCards}/${RESOURCE_LIMITS.cards}。卡用得越多，结算时扣得越多。`;
+  const usedCards = session.max_cards - session.cards_remaining;
+  return `已用卡牌 ${usedCards}/${session.max_cards}。卡用得越多，结算时扣得越多。`;
 }
 
 export function describeLivePriority(session: SessionSnapshot): string {

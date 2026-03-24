@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   CardId,
   PendingActionKind,
+  ProgressSnapshot,
   ScoreHistoryEntry,
   SessionSnapshot
 } from "./types";
@@ -10,8 +11,10 @@ import {
   saveFinishedSessionHistory
 } from "./scoreHistory";
 import {
+  advanceLevel,
   getPlayerId,
-  startSession,
+  getProgression,
+  startCurrentLevel,
   stepSession,
   submitGuess,
   useCard
@@ -44,6 +47,8 @@ function getErrorMessage(error: unknown): string {
 export function useGameSession() {
   const playerIdRef = useRef(getPlayerId());
   const [session, setSession] = useState<SessionSnapshot | null>(null);
+  const [progression, setProgression] = useState<ProgressSnapshot | null>(null);
+  const [progressionLoading, setProgressionLoading] = useState(true);
   const [history, setHistory] = useState<ScoreHistoryEntry[]>(() =>
     readScoreHistory(playerIdRef.current)
   );
@@ -52,16 +57,47 @@ export function useGameSession() {
   const [error, setError] = useState<SessionErrorState | null>(null);
   const mountedRef = useRef(true);
   const requestSequenceRef = useRef(0);
+  const progressionSequenceRef = useRef(0);
   const lastFailedRequestRef = useRef<SessionRequestDescriptor | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
+    void loadProgression();
 
     return () => {
       mountedRef.current = false;
       requestSequenceRef.current += 1;
+      progressionSequenceRef.current += 1;
     };
   }, []);
+
+  async function loadProgression(silent = false) {
+    const requestId = progressionSequenceRef.current + 1;
+    progressionSequenceRef.current = requestId;
+    if (!silent || progression === null) {
+      setProgressionLoading(true);
+    }
+
+    try {
+      const next = await getProgression();
+      if (!mountedRef.current || requestId !== progressionSequenceRef.current) {
+        return;
+      }
+      setProgression(next);
+    } catch {
+      if (!mountedRef.current || requestId !== progressionSequenceRef.current) {
+        return;
+      }
+    } finally {
+      if (
+        mountedRef.current &&
+        requestId === progressionSequenceRef.current &&
+        (!silent || progression === null)
+      ) {
+        setProgressionLoading(false);
+      }
+    }
+  }
 
   async function runSessionRequest(descriptor: SessionRequestDescriptor) {
     const requestId = requestSequenceRef.current + 1;
@@ -133,6 +169,14 @@ export function useGameSession() {
   }, [pendingAction, session]);
 
   useEffect(() => {
+    if (!session) {
+      return;
+    }
+
+    void loadProgression(true);
+  }, [session?.session_id, session?.status]);
+
+  useEffect(() => {
     if (!session || session.status === "playing" || !session.ended_at) {
       return;
     }
@@ -144,8 +188,21 @@ export function useGameSession() {
     setSelectedGuess(null);
     await runSessionRequest({
       kind: "start",
-      requestFactory: () => startSession(),
-      title: "启动扫描"
+      requestFactory: () => startCurrentLevel(),
+      title: progression?.completed_count ? "开始当前关" : "开始第一关"
+    });
+  }
+
+  async function advanceToNextLevel() {
+    if (!session) {
+      return;
+    }
+
+    setSelectedGuess(null);
+    await runSessionRequest({
+      kind: "advance",
+      requestFactory: () => advanceLevel(session.session_id),
+      title: "进入下一关"
     });
   }
 
@@ -189,11 +246,14 @@ export function useGameSession() {
       pendingAction !== null || !session || session.status !== "playing",
     error,
     pendingAction,
+    progression,
+    progressionLoading,
     selectedGuess,
     session,
     history,
     setSelectedGuess,
     applyCard,
+    advanceToNextLevel,
     startRound,
     submitSelectedGuess,
     retryLastAction,

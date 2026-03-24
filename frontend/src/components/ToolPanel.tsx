@@ -1,9 +1,6 @@
 import type { CardId, SessionSnapshot } from "../game/types";
 import type { PendingActionKind } from "../game/types";
-import {
-  CARD_TOOL_GUIDE,
-  RESOURCE_LIMITS
-} from "../content/gameGuide";
+import { CARD_TOOL_GUIDE } from "../content/gameGuide";
 
 type ToolPanelProps = {
   busyAction: PendingActionKind | null;
@@ -18,28 +15,35 @@ const CARD_ORDER: readonly CardId[] = [
   "bio-scan"
 ];
 
+const CARD_FAMILY_LABEL: Record<CardId, string> = {
+  "sharpen-outline": "通用稳像",
+  "mechanical-lens": "机械 / 建筑",
+  "bio-scan": "生物目标"
+};
+
 export function ToolPanel({
   busyAction,
   session,
   disabled,
   onUseCard
 }: ToolPanelProps) {
-  const cardsRemaining = session?.cards_remaining ?? RESOURCE_LIMITS.cards;
+  const cardsRemaining = session?.cards_remaining ?? 0;
+  const maxCards = session?.max_cards ?? 0;
 
   return (
     <section className="panel side-panel">
       <div className="panel-heading">
         <div>
           <p className="eyebrow">唯一工具</p>
-          <h2>引导卡组</h2>
+          <h2 className="tool-panel__title">引导卡组</h2>
         </div>
         <span className="tool-counter">
-          剩余 {cardsRemaining}/{RESOURCE_LIMITS.cards}
+          {session ? `剩余 ${cardsRemaining}/${maxCards}` : "等待开局"}
         </span>
       </div>
 
       <p className="tool-intro">
-        只保留卡牌干预。先看主体家族，再用最值得的那一张。
+        先看主体家族，再决定是否出卡。
       </p>
 
       <div className="tool-grid">
@@ -61,16 +65,23 @@ export function ToolPanel({
               <div className="tool-card__header">
                 <strong>{guide.title}</strong>
                 <span className={`tool-badge ${used ? "tool-badge--used" : ""}`}>
-                  {used ? "已使用" : "可用"}
+                  {used ? "已使用" : CARD_FAMILY_LABEL[cardId]}
                 </span>
               </div>
-              <p className="tool-card__summary">
-                {guide.effect}
-              </p>
-              <p className="tool-card__hint">{guide.cost}</p>
-              <p className="tool-card__hint tool-card__hint--secondary">
-                {guide.timing}
-              </p>
+              <div className="tool-card__body">
+                <span className="tool-card__line">
+                  <strong>效果</strong>
+                  {guide.effect}
+                </span>
+                <span className="tool-card__line">
+                  <strong>代价</strong>
+                  {guide.cost}
+                </span>
+                <span className="tool-card__line">
+                  <strong>适合</strong>
+                  {guide.timing}
+                </span>
+              </div>
               <button
                 className="tool-card__action"
                 disabled={blocked}
