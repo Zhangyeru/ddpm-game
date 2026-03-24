@@ -12,11 +12,17 @@ from typing import Callable
 
 from .auth import PlayerCampaignProgress, SQLiteAuthStore, is_user_actor, user_id_from_actor
 from .frame_renderer import DEFAULT_TOTAL_FRAMES
-from .game_data import CARD_DEFINITIONS, TARGETS, TargetDefinition
+from .game_data import (
+    CARD_DEFINITIONS,
+    FREEZE_REGION_DEFINITIONS,
+    TARGETS,
+    TargetDefinition,
+)
 from .gameplay_config import (
     GAME_CONFIG,
     LEVEL_DEFINITIONS,
     LevelDefinition,
+    LevelRuleId,
     MissionType,
     ScoreBreakdownData,
     all_levels,
@@ -42,6 +48,7 @@ from .schemas import (
     ScoreBreakdown,
     ScoreEvent,
     SessionSnapshot,
+    TargetFamily,
 )
 from .trajectory_store import FrameAsset, TrajectoryStore
 
@@ -49,6 +56,13 @@ from .trajectory_store import FrameAsset, TrajectoryStore
 SESSION_TTL_SECONDS = GAME_CONFIG.presentation.session_ttl_seconds
 MAX_STABILITY = GAME_CONFIG.resources.max_stability
 MAX_CORRUPTION = GAME_CONFIG.resources.max_corruption
+MASKED_CANDIDATE_LABEL = "未知信号"
+FAMILY_LABELS: dict[str, str] = {
+    "living": "生物",
+    "machine": "机械",
+    "structure": "建筑",
+}
+CARD_DISABLE_PRIORITY = ("mechanical-lens", "bio-scan", "sharpen-outline")
 
 
 @dataclass
@@ -63,6 +77,9 @@ class Session:
     chapter_title: str
     level_title: str
     level_summary: str
+    level_rule_id: LevelRuleId
+    rule_summary: str
+    rule_badges: tuple[str, ...]
     mission_type: MissionType
     mission_title: str
     target: TargetDefinition
@@ -70,6 +87,18 @@ class Session:
     max_guesses: int
     max_cards: int
     risk_multiplier: float
+    hidden_candidate_indices: set[int] = field(default_factory=set)
+    rotating_echo_index: int | None = None
+    rotating_echo_pool: list[str] = field(default_factory=list)
+    objective_phase: str = "standard"
+    committed_family: str | None = None
+    freeze_remaining: int = 0
+    frozen_region: str | None = None
+    disabled_card_ids: list[str] = field(default_factory=list)
+    step_streak: int = 0
+    threshold_triggered: bool = False
+    evidence_debt: int = 0
+    freeze_step_tax_pending: bool = False
     score: int = 0
     combo: int = 0
     status: str = "playing"
@@ -182,17 +211,20 @@ class GameService:
             if session.status != "playing":
                 return self._snapshot(session)
 
+            session.step_streak += 1
             session.frame_index = min(session.total_frames - 1, session.frame_index + 1)
             session.frames_remaining = max(0, session.frames_remaining - 1)
             step_delta = step_risk(session.total_frames, risk_multiplier=session.risk_multiplier)
+            extra_stability_delta, extra_corruption_delta = self._step_rule_adjustments(session)
             self._shift_risk(
                 session,
-                stability_delta=step_delta.stability,
-                corruption_delta=step_delta.corruption,
+                stability_delta=step_delta.stability + extra_stability_delta,
+                corruption_delta=step_delta.corruption + extra_corruption_delta,
             )
 
             if session.frame_index in progress_event_frames(session.total_frames):
                 self._append_event(session, self._progress_message(session))
+                self._apply_progression_rule_updates(session)
 
             if (
                 session.corruption >= GAME_CONFIG.presentation.corrupted_variant_threshold
@@ -200,6 +232,7 @@ class GameService:
             ):
                 self._append_event(session, "污染度过高，画面开始出现伪轮廓和裂缝。")
 
+            self._apply_threshold_rule_updates(session)
             self._resolve_if_failed(session)
             return self._snapshot(session)
 
@@ -212,7 +245,9 @@ class GameService:
             guess = label.strip()
             if not guess:
                 raise ValueError("猜测不能为空。")
-            if guess not in session.candidate_labels:
+            if session.level_rule_id in {"dual-phase-identification", "final-archive"} and session.objective_phase == "classify":
+                raise ValueError("当前关卡需要先完成家族判定。")
+            if guess not in self._guessable_labels(session):
                 raise ValueError("猜测必须来自当前候选列表。")
 
             if guess == session.target.label:
@@ -228,6 +263,7 @@ class GameService:
                     process_score_total=session.score,
                     max_cards_total=session.max_cards,
                 )
+                breakdown = self._apply_settlement_rule_adjustments(session, breakdown)
                 session.score = breakdown.final_score
                 session.combo = self._record_win(session.player_id)
                 session.status = "won"
@@ -241,6 +277,7 @@ class GameService:
                     delta=breakdown.settlement_score,
                     detail=self._settlement_detail(breakdown),
                 )
+                self._append_rule_settlement_events(session)
                 self._complete_level(session)
                 self._append_event(
                     session,
@@ -248,6 +285,7 @@ class GameService:
                 )
                 return self._snapshot(session)
 
+            session.step_streak = 0
             session.remaining_guesses = max(0, session.remaining_guesses - 1)
             session.score += GAME_CONFIG.actions.wrong_guess.score
             self._shift_risk(
@@ -277,14 +315,17 @@ class GameService:
                 return self._snapshot(session)
             if card_id not in CARD_DEFINITIONS:
                 raise ValueError("未知卡牌。")
-            if session.cards_remaining <= 0 or card_id in session.used_cards:
+            if self._card_blocked(session, card_id):
                 return self._snapshot(session)
+            if session.level_rule_id == "family-commit" and session.committed_family is None and card_id != "sharpen-outline":
+                raise ValueError("本关需要先提交目标家族，才能启用家族卡。")
 
             session.used_cards.append(card_id)
             session.cards_remaining -= 1
             definition = CARD_DEFINITIONS[card_id]
             matched = self._card_matches_target(session, card_id)
             effect = card_effect(card_id, matched=matched)
+            session.step_streak = 0
 
             self._shift_risk(
                 session,
@@ -316,7 +357,98 @@ class GameService:
                     corruption_delta=effect.corruption,
                 ),
             )
+            self._apply_post_card_rule_updates(session, card_id=card_id, matched=matched)
 
+            self._resolve_if_failed(session)
+            return self._snapshot(session)
+
+    def commit_family(
+        self,
+        player_id: str | None,
+        session_id: str,
+        family: TargetFamily,
+    ) -> SessionSnapshot:
+        with self._lock:
+            session = self._get_session(player_id, session_id)
+            if session.status != "playing":
+                return self._snapshot(session)
+            if not self._requires_family_commit(session):
+                raise ValueError("当前关卡不需要提交目标家族。")
+            if session.committed_family is not None:
+                raise ValueError("本局已经提交过目标家族。")
+
+            session.step_streak = 0
+            session.committed_family = family
+            if session.level_rule_id in {"dual-phase-identification", "final-archive"}:
+                session.objective_phase = "identify"
+
+            if family == session.target.family:
+                self._append_event(session, f"家族判定已锁定为：{FAMILY_LABELS[family]}。共振方向正确。")
+                self._append_score_event(
+                    session,
+                    kind="rule",
+                    title="家族判定",
+                    delta=6,
+                    detail="家族判定正确，后续判断路线更稳定。",
+                )
+                session.score += 6
+                session.stability = min(MAX_STABILITY, session.stability + 4)
+            else:
+                self._append_event(session, f"家族判定已锁定为：{FAMILY_LABELS[family]}。共振方向错误。")
+                if session.level_rule_id == "family-commit":
+                    session.disabled_card_ids.extend(
+                        card_id
+                        for card_id in ("mechanical-lens", "bio-scan")
+                        if card_id not in session.disabled_card_ids
+                    )
+                self._append_score_event(
+                    session,
+                    kind="rule",
+                    title="错误承诺",
+                    delta=-8,
+                    detail="家族判定错误，后续高价值家族卡会失去优势。",
+                )
+                session.score -= 8
+                self._shift_risk(session, stability_delta=-4, corruption_delta=6)
+
+            self._resolve_if_failed(session)
+            return self._snapshot(session)
+
+    def freeze(
+        self,
+        player_id: str | None,
+        session_id: str,
+        region: str,
+    ) -> SessionSnapshot:
+        with self._lock:
+            session = self._get_session(player_id, session_id)
+            if session.status != "playing":
+                return self._snapshot(session)
+            if region not in FREEZE_REGION_DEFINITIONS:
+                raise ValueError("未知冻结区域。")
+            if session.freeze_remaining <= 0:
+                raise ValueError("当前没有可用冻结次数。")
+            if session.frozen_region is not None:
+                raise ValueError("本局已经完成区域冻结。")
+
+            session.step_streak = 0
+            session.freeze_remaining -= 1
+            session.frozen_region = region
+            self._shift_risk(session, stability_delta=4, corruption_delta=-3)
+            if session.level_rule_id in {"freeze-delay", "final-archive"}:
+                session.freeze_step_tax_pending = True
+            self._append_event(
+                session,
+                f"已冻结 {FREEZE_REGION_DEFINITIONS[region].title}，后续显影将优先保留该区域结构。",
+            )
+            self._append_score_event(
+                session,
+                kind="rule",
+                title="区域冻结",
+                delta=4,
+                detail=f"冻结 {FREEZE_REGION_DEFINITIONS[region].title}，稳定 +4，污染 -3。",
+            )
+            session.score += 4
             self._resolve_if_failed(session)
             return self._snapshot(session)
 
@@ -382,7 +514,7 @@ class GameService:
         sample_id = rng.choice(self.trajectory_store.sample_ids_for_target(target.label))
 
         session_id = uuid.uuid4().hex
-        return Session(
+        session = Session(
             session_id=session_id,
             player_id=player_key,
             frame_secret=uuid.uuid4().hex,
@@ -393,6 +525,9 @@ class GameService:
             chapter_title=level_definition.chapter_title,
             level_title=level_definition.level_title,
             level_summary=level_definition.summary,
+            level_rule_id=level_definition.rule_id,
+            rule_summary=level_definition.rule_summary,
+            rule_badges=level_definition.rule_badges,
             mission_type=level_definition.mission_type,
             mission_title=level_definition.mission_title,
             target=target,
@@ -412,11 +547,14 @@ class GameService:
             events=[
                 f"{level_definition.chapter_title} · 第 {level_definition.level} 关：{level_definition.level_title}。",
                 level_definition.summary,
+                f"规则：{level_definition.rule_summary}",
                 f"分类提示：{target.hint}。",
                 f"当前任务：{level_definition.mission_title}。",
             ],
             last_touched_at=self.clock(),
         )
+        self._initialize_rule_state(session)
+        return session
 
     def _complete_level(self, session: Session) -> None:
         progress = self._campaign_progress(session.player_id)
@@ -608,11 +746,14 @@ class GameService:
         return SessionSnapshot(
             session_id=session.session_id,
             level_id=session.level_id,
+            rule_id=session.level_rule_id,
             chapter=session.chapter,
             level=session.level,
             chapter_title=session.chapter_title,
             level_title=session.level_title,
             level_summary=session.level_summary,
+            rule_summary=session.rule_summary,
+            rule_badges=list(session.rule_badges),
             score=session.score,
             combo=session.combo,
             status=session.status,
@@ -624,17 +765,29 @@ class GameService:
             total_frames=session.total_frames,
             progress=round(progress, 4),
             image_url=self._frame_url(session, session.frame_index, variant_key),
-            candidate_labels=session.candidate_labels,
+            candidate_labels=self._visible_candidate_labels(session),
+            masked_candidates=[
+                label
+                for label in self._visible_candidate_labels(session)
+                if label == MASKED_CANDIDATE_LABEL
+            ],
             remaining_guesses=session.remaining_guesses,
             max_guesses=session.max_guesses,
             cards_remaining=session.cards_remaining,
             max_cards=session.max_cards,
+            disabled_card_ids=session.disabled_card_ids,  # type: ignore[arg-type]
             hint=session.hint,
             events=session.events,
             card_options=list(self.card_options),
             used_cards=session.used_cards,  # type: ignore[arg-type]
             revealed_target=session.revealed_target,
             phase_label=self._phase_label(session),
+            objective_phase=session.objective_phase,  # type: ignore[arg-type]
+            family_commit_required=self._requires_family_commit(session),
+            committed_family=session.committed_family,  # type: ignore[arg-type]
+            freeze_remaining=session.freeze_remaining,
+            frozen_region=session.frozen_region,  # type: ignore[arg-type]
+            rule_status=self._rule_status(session),
             mission_title=session.mission_title,
             threat_label=self._threat_label(corruption_value),
             step_interval_ms=interval_ms,
@@ -729,6 +882,9 @@ class GameService:
         if session.corruption >= GAME_CONFIG.presentation.corrupted_variant_threshold:
             return "corrupted"
 
+        if session.frozen_region is not None:
+            return f"freeze_{session.frozen_region.replace('-', '_')}"
+
         if "mechanical-lens" in session.used_cards and session.target.family in {
             "machine",
             "structure",
@@ -752,6 +908,223 @@ class GameService:
         if card_id == "bio-scan":
             return session.target.family == "living"
         return True
+
+    def _initialize_rule_state(self, session: Session) -> None:
+        if session.level_rule_id in {"freeze-choice", "freeze-delay", "final-archive"}:
+            session.freeze_remaining = 1
+        if self._requires_family_commit(session):
+            session.objective_phase = "classify"
+        if session.level_rule_id in {"masked-candidates", "final-archive"}:
+            session.hidden_candidate_indices = self._pick_masked_candidate_indices(session, count=2)
+        if session.level_rule_id == "rotating-echo":
+            session.rotating_echo_index = self._pick_rotating_echo_index(session)
+            session.rotating_echo_pool = self._build_rotating_echo_pool(session)
+
+    def _requires_family_commit(self, session: Session) -> bool:
+        return session.level_rule_id in {
+            "family-commit",
+            "dual-phase-identification",
+            "final-archive",
+        }
+
+    def _card_blocked(self, session: Session, card_id: str) -> bool:
+        return (
+            session.cards_remaining <= 0
+            or card_id in session.disabled_card_ids
+            or card_id in session.used_cards
+        )
+
+    def _step_rule_adjustments(self, session: Session) -> tuple[float, float]:
+        extra_stability_delta = 0.0
+        extra_corruption_delta = 0.0
+        if session.level_rule_id == "noise-budget" and session.step_streak > 1:
+            extra_corruption_delta += 4 + (session.step_streak - 2) * 2
+        if session.freeze_step_tax_pending:
+            session.frames_remaining = max(0, session.frames_remaining - 1)
+            extra_corruption_delta += 6
+            session.freeze_step_tax_pending = False
+            self._append_event(session, "冻结延迟生效：本次推进额外消耗了解码窗口。")
+        return extra_stability_delta, extra_corruption_delta
+
+    def _apply_progression_rule_updates(self, session: Session) -> None:
+        if session.level_rule_id in {"masked-candidates", "final-archive"}:
+            self._reveal_hidden_candidate(session)
+        if session.level_rule_id == "rotating-echo":
+            self._rotate_echo_candidate(session)
+
+    def _apply_threshold_rule_updates(self, session: Session) -> None:
+        if session.level_rule_id != "corruption-reorder":
+            return
+        if session.threshold_triggered or session.corruption < 50:
+            return
+        session.threshold_triggered = True
+        rng = random.Random(f"{session.session_id}:threshold")
+        rng.shuffle(session.candidate_labels)
+        disabled_card = next(
+            (
+                card_id
+                for card_id in CARD_DISABLE_PRIORITY
+                if card_id not in session.disabled_card_ids and card_id not in session.used_cards
+            ),
+            None,
+        )
+        if disabled_card is not None:
+            session.disabled_card_ids.append(disabled_card)
+        self._append_event(session, "污染跨过阈值：候选顺序被打乱，工具许可也被改写。")
+
+    def _apply_post_card_rule_updates(self, session: Session, *, card_id: str, matched: bool) -> None:
+        if session.level_rule_id == "family-commit" and session.committed_family == session.target.family:
+            if card_id in {"mechanical-lens", "bio-scan"} and matched:
+                session.score += 4
+                self._shift_risk(session, stability_delta=2, corruption_delta=-2)
+                self._append_event(session, "承诺与卡牌共振一致，读数额外稳定。")
+        if session.level_rule_id == "single-card-contract":
+            session.disabled_card_ids.extend(
+                other_id
+                for other_id in CARD_DEFINITIONS
+                if other_id != card_id and other_id not in session.disabled_card_ids
+            )
+            self._append_event(session, f"契约生效：{CARD_DEFINITIONS[card_id].title} 成为本局唯一授权工具。")
+        if session.level_rule_id == "evidence-debt":
+            session.evidence_debt += 18
+            self._append_event(session, f"证据债务累积：当前结算债务 -{session.evidence_debt}。")
+
+    def _apply_settlement_rule_adjustments(
+        self,
+        session: Session,
+        breakdown: ScoreBreakdownData,
+    ) -> ScoreBreakdownData:
+        if session.level_rule_id != "evidence-debt":
+            return breakdown
+        if session.evidence_debt <= 0 or round(session.corruption) <= 40:
+            return breakdown
+        return ScoreBreakdownData(
+            process_score_total=breakdown.process_score_total,
+            base_score=breakdown.base_score,
+            early_bonus=breakdown.early_bonus,
+            time_bonus=breakdown.time_bonus,
+            stability_bonus=breakdown.stability_bonus,
+            low_corruption_bonus=breakdown.low_corruption_bonus,
+            mission_bonus=breakdown.mission_bonus,
+            card_penalty=breakdown.card_penalty + session.evidence_debt,
+            settlement_score=breakdown.settlement_score - session.evidence_debt,
+            final_score=breakdown.final_score - session.evidence_debt,
+        )
+
+    def _append_rule_settlement_events(self, session: Session) -> None:
+        if session.level_rule_id != "evidence-debt" or session.evidence_debt <= 0:
+            return
+        if round(session.corruption) <= 40:
+            self._append_score_event(
+                session,
+                kind="rule",
+                title="证据债务豁免",
+                delta=0,
+                detail="以低污染完成识别，本局证据债务被全部豁免。",
+            )
+            return
+        self._append_score_event(
+            session,
+            kind="rule",
+            title="证据债务",
+            delta=-session.evidence_debt,
+            detail=f"高污染完成识别，结算额外扣除 {session.evidence_debt} 分。",
+        )
+
+    def _visible_candidate_labels(self, session: Session) -> list[str]:
+        return [
+            MASKED_CANDIDATE_LABEL if index in session.hidden_candidate_indices else label
+            for index, label in enumerate(session.candidate_labels)
+        ]
+
+    def _guessable_labels(self, session: Session) -> list[str]:
+        return [
+            label
+            for index, label in enumerate(session.candidate_labels)
+            if index not in session.hidden_candidate_indices
+        ]
+
+    def _pick_masked_candidate_indices(self, session: Session, *, count: int) -> set[int]:
+        candidate_indices = [
+            index
+            for index, label in enumerate(session.candidate_labels)
+            if label != session.target.label
+        ]
+        rng = random.Random(f"{session.session_id}:mask")
+        rng.shuffle(candidate_indices)
+        return set(candidate_indices[:count])
+
+    def _reveal_hidden_candidate(self, session: Session) -> None:
+        if not session.hidden_candidate_indices:
+            return
+        next_index = sorted(session.hidden_candidate_indices)[0]
+        session.hidden_candidate_indices.remove(next_index)
+        self._append_event(session, f"新线索解锁：候选槽位显露为 {session.candidate_labels[next_index]}。")
+
+    def _pick_rotating_echo_index(self, session: Session) -> int | None:
+        for index, label in enumerate(session.candidate_labels):
+            if label != session.target.label:
+                return index
+        return None
+
+    def _build_rotating_echo_pool(self, session: Session) -> list[str]:
+        target_pool = level_by_id(session.level_id).target_pool
+        return [
+            label
+            for label in target_pool
+            if label != session.target.label and label not in session.candidate_labels
+        ]
+
+    def _rotate_echo_candidate(self, session: Session) -> None:
+        if session.rotating_echo_index is None or not session.rotating_echo_pool:
+            return
+        current_label = session.candidate_labels[session.rotating_echo_index]
+        replacement = session.rotating_echo_pool.pop(0)
+        session.candidate_labels[session.rotating_echo_index] = replacement
+        session.rotating_echo_pool.append(current_label)
+        self._append_event(session, f"回声诱饵变化：一条候选信号已替换为 {replacement}。")
+
+    def _rule_status(self, session: Session) -> str | None:
+        if session.level_rule_id == "final-archive":
+            family_text = (
+                "等待家族判定"
+                if session.committed_family is None
+                else f"已判定 {FAMILY_LABELS[session.committed_family]}"
+            )
+            freeze_text = (
+                "未冻结"
+                if session.frozen_region is None
+                else f"已冻结 {FREEZE_REGION_DEFINITIONS[session.frozen_region].title}"
+            )
+            hidden = len(session.hidden_candidate_indices)
+            return f"{family_text} / {freeze_text} / 已揭示 {len(session.candidate_labels) - hidden}/{len(session.candidate_labels)} 候选。"
+        if self._requires_family_commit(session):
+            if session.committed_family is None:
+                return "当前阶段：先完成目标家族判定。"
+            return f"已承诺家族：{FAMILY_LABELS[session.committed_family]}。"
+        if session.level_rule_id in {"freeze-choice", "freeze-delay"}:
+            if session.frozen_region is None:
+                return f"冻结次数：{session.freeze_remaining}/1。"
+            return f"已冻结区域：{FREEZE_REGION_DEFINITIONS[session.frozen_region].title}。"
+        if session.level_rule_id in {"masked-candidates", "final-archive"}:
+            hidden = len(session.hidden_candidate_indices)
+            revealed = len(session.candidate_labels) - hidden
+            return f"候选揭示进度：{revealed}/{len(session.candidate_labels)}。"
+        if session.level_rule_id == "rotating-echo":
+            return "阶段点会替换 1 个诱饵候选。"
+        if session.level_rule_id == "single-card-contract":
+            if not session.used_cards:
+                return "首次用卡将锁定本局唯一工具。"
+            return f"契约卡：{CARD_DEFINITIONS[session.used_cards[0]].title}。"
+        if session.level_rule_id == "noise-budget":
+            return f"连续推进计数：{session.step_streak}。连续推进越多，额外污染越高。"
+        if session.level_rule_id == "corruption-reorder":
+            if session.threshold_triggered:
+                return "污染阈值已触发：候选已重排。"
+            return "污染达到 50 后会触发候选重排和工具禁用。"
+        if session.level_rule_id == "evidence-debt":
+            return f"当前证据债务：-{session.evidence_debt}。低污染完成可豁免。"
+        return None
 
     def _phase_label(self, session: Session) -> str:
         progress = session.frame_index / max(session.total_frames - 1, 1)

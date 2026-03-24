@@ -65,4 +65,28 @@ TRAJECTORY_VARIANTS: dict[str, TrajectoryVariant] = {
         corruption_noise_scale=0.03,
         corruption_noise_points=(0.2, 0.4, 0.6, 0.8),
     ),
+    "freeze_upper_left": TrajectoryVariant(
+        key="freeze_upper_left",
+        prompt_suffix="preserve the upper-left region, keep composition stable, photograph remains realistic",
+        inversion_guidance_scale=0.12,
+        guidance_scale=1.4,
+        frozen_region="upper-left",
+        reference_lead_steps=12,
+    ),
+    "freeze_center": TrajectoryVariant(
+        key="freeze_center",
+        prompt_suffix="preserve the center region, keep subject silhouette stable, photograph remains realistic",
+        inversion_guidance_scale=0.12,
+        guidance_scale=1.4,
+        frozen_region="center",
+        reference_lead_steps=12,
+    ),
+    "freeze_lower_right": TrajectoryVariant(
+        key="freeze_lower_right",
+        prompt_suffix="preserve the lower-right region, keep structure stable, photograph remains realistic",
+        inversion_guidance_scale=0.12,
+        guidance_scale=1.4,
+        frozen_region="lower-right",
+        reference_lead_steps=12,
+    ),
 }

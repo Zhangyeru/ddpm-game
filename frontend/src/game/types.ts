@@ -2,10 +2,14 @@ export type CardId =
   | "sharpen-outline"
   | "mechanical-lens"
   | "bio-scan";
+export type TargetFamily = "living" | "machine" | "structure";
+export type FreezeRegionId = "upper-left" | "center" | "lower-right";
 
 export type GameStatus = "playing" | "won" | "lost";
 export type PendingActionKind =
   | "advance"
+  | "commit-family"
+  | "freeze"
   | "login"
   | "progression"
   | "logout"
@@ -18,7 +22,8 @@ export type ScoreEventKind =
   | "card"
   | "guess_penalty"
   | "settlement"
-  | "loss";
+  | "loss"
+  | "rule";
 
 export interface CardOption {
   id: CardId;
@@ -106,11 +111,14 @@ export interface LeaderboardEntry {
 export interface SessionSnapshot {
   session_id: string;
   level_id: string;
+  rule_id: string;
   chapter: number;
   level: number;
   chapter_title: string;
   level_title: string;
   level_summary: string;
+  rule_summary: string;
+  rule_badges: string[];
   score: number;
   combo: number;
   status: GameStatus;
@@ -123,16 +131,24 @@ export interface SessionSnapshot {
   progress: number;
   image_url: string;
   candidate_labels: string[];
+  masked_candidates: string[];
   remaining_guesses: number;
   max_guesses: number;
   cards_remaining: number;
   max_cards: number;
+  disabled_card_ids: CardId[];
   hint: string;
   events: string[];
   card_options: CardOption[];
   used_cards: CardId[];
   revealed_target: string | null;
   phase_label: string;
+  objective_phase: "standard" | "classify" | "identify";
+  family_commit_required: boolean;
+  committed_family: TargetFamily | null;
+  freeze_remaining: number;
+  frozen_region: FreezeRegionId | null;
+  rule_status: string | null;
   mission_title: string;
   threat_label: string;
   step_interval_ms: number;

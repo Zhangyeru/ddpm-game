@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 
 from fastapi.testclient import TestClient
 
+from backend.app.auth import actor_id_for_anonymous
 from backend.app.main import create_app
 from backend.app.settings import Settings
 
@@ -70,6 +71,41 @@ def test_progression_and_advance_endpoints_work() -> None:
         refreshed_progression = client.get("/api/progression", headers=headers)
         assert refreshed_progression.status_code == 200
         assert refreshed_progression.json()["campaign_total_score"] > 0
+
+
+def test_commit_family_and_freeze_endpoints_work() -> None:
+    with TemporaryDirectory() as temp_dir:
+        client, service = make_test_client(temp_dir)
+        headers = {"X-Player-Id": "api-rule-player"}
+        actor_id = actor_id_for_anonymous("api-rule-player")
+
+        progress = service._campaign_progress(actor_id)
+        progress.current_level_id = "chapter-3-level-1"
+
+        classify_session = client.post("/api/session/start-current-level", headers=headers).json()
+        target_family = service.sessions[classify_session["session_id"]].target.family
+        commit_response = client.post(
+            f"/api/session/{classify_session['session_id']}/commit-family",
+            headers=headers,
+            json={"family": target_family},
+        )
+
+        assert commit_response.status_code == 200
+        assert commit_response.json()["committed_family"] == target_family
+        assert commit_response.json()["objective_phase"] == "identify"
+
+        progress.current_level_id = "chapter-1-level-3"
+
+        freeze_session = client.post("/api/session/start-current-level", headers=headers).json()
+        freeze_response = client.post(
+            f"/api/session/{freeze_session['session_id']}/freeze",
+            headers=headers,
+            json={"region": "center"},
+        )
+
+        assert freeze_response.status_code == 200
+        assert freeze_response.json()["frozen_region"] == "center"
+        assert freeze_response.json()["freeze_remaining"] == 0
 
 
 def test_leaderboard_endpoint_returns_ranked_users() -> None:

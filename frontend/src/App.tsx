@@ -6,6 +6,7 @@ import { InlineError } from "./components/InlineError";
 import { LandingGuide } from "./components/LandingGuide";
 import { LeaderboardPage } from "./components/LeaderboardPage";
 import { LoadingRoundShell } from "./components/LoadingRoundShell";
+import { RulePanel } from "./components/RulePanel";
 import { ScorePanel } from "./components/ScorePanel";
 import { StatusBar } from "./components/StatusBar";
 import { ToolPanel } from "./components/ToolPanel";
@@ -37,6 +38,7 @@ export default function App() {
     session,
     history,
     applyCard,
+    applyFreeze,
     advanceToNextLevel,
     clearAuthError,
     startRound,
@@ -44,6 +46,7 @@ export default function App() {
     logout,
     register,
     submitGuessChoice,
+    submitFamilyCommit,
     retryLastAction,
     retryLeaderboard,
     clearError
@@ -174,6 +177,17 @@ export default function App() {
           </div>
 
           <div className="console-stack console-stack--right">
+            <RulePanel
+              busyAction={pendingAction}
+              disabled={controlsDisabled}
+              onCommitFamily={(family) => {
+                void submitFamilyCommit(family);
+              }}
+              onFreeze={(region) => {
+                void applyFreeze(region);
+              }}
+              session={session}
+            />
             <ToolPanel
               busyAction={pendingAction}
               disabled={controlsDisabled}

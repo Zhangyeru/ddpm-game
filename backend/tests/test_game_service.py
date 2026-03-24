@@ -179,6 +179,42 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(stale_advance.level_id, "chapter-1-level-3")
         self.assertEqual(stale_advance.status, "playing")
 
+    def test_masked_candidate_level_hides_two_candidates_until_progression(self) -> None:
+        progress = self.service._campaign_progress("player-a")
+        progress.current_level_id = "chapter-2-level-1"
+        snapshot = self.service.start_current_level("player-a")
+
+        self.assertEqual(snapshot.masked_candidates, ["未知信号", "未知信号"])
+
+        stepped = snapshot
+        while len(stepped.masked_candidates) == 2:
+            stepped = self.service.step("player-a", snapshot.session_id)
+
+        self.assertLess(len(stepped.masked_candidates), 2)
+
+    def test_dual_phase_level_requires_family_commit_before_guess(self) -> None:
+        progress = self.service._campaign_progress("player-a")
+        progress.current_level_id = "chapter-3-level-1"
+        snapshot = self.service.start_current_level("player-a")
+        session = self.service.sessions[snapshot.session_id]
+
+        with self.assertRaises(ValueError):
+            self.service.guess("player-a", snapshot.session_id, session.target.label)
+
+        committed = self.service.commit_family("player-a", snapshot.session_id, session.target.family)
+
+        self.assertEqual(committed.objective_phase, "identify")
+
+    def test_freeze_choice_consumes_charge_and_sets_region(self) -> None:
+        progress = self.service._campaign_progress("player-a")
+        progress.current_level_id = "chapter-1-level-3"
+        snapshot = self.service.start_current_level("player-a")
+
+        frozen = self.service.freeze("player-a", snapshot.session_id, "center")
+
+        self.assertEqual(frozen.freeze_remaining, 0)
+        self.assertEqual(frozen.frozen_region, "center")
+
     def test_loss_does_not_advance_level(self) -> None:
         snapshot = self.service.start_session("player-a")
         session = self.service.sessions[snapshot.session_id]
@@ -275,6 +311,7 @@ class GameServiceTest(unittest.TestCase):
         }
         snapshot = self.service.start_current_level("player-a")
         session = self.service.sessions[snapshot.session_id]
+        self.service.commit_family("player-a", snapshot.session_id, session.target.family)
 
         result = self.service.guess("player-a", snapshot.session_id, session.target.label)
         progression = self.service.get_progression("player-a")

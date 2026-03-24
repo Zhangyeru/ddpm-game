@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import type {
   AuthUser,
   CardId,
+  FreezeRegionId,
   LeaderboardEntry,
   PendingActionKind,
   ProgressSnapshot,
   ScoreHistoryEntry,
-  SessionSnapshot
+  SessionSnapshot,
+  TargetFamily
 } from "./types";
 import {
   readScoreHistory,
@@ -15,6 +17,8 @@ import {
 import {
   ApiError,
   advanceLevel,
+  commitFamily,
+  freezeRegion,
   getCurrentUser,
   getLeaderboard,
   getPlayerId,
@@ -427,6 +431,34 @@ export function useGameSession(options?: { autoStepEnabled?: boolean }) {
     });
   }
 
+  async function submitFamilyCommit(family: TargetFamily) {
+    if (!session) {
+      return;
+    }
+
+    setSelectedGuess(null);
+    await runSessionRequest({
+      kind: "commit-family",
+      requestFactory: () => commitFamily(session.session_id, family),
+      title: "提交目标家族"
+    });
+  }
+
+  async function applyFreeze(region: FreezeRegionId) {
+    if (!session) {
+      return;
+    }
+
+    await runSessionRequest({
+      kind: "freeze",
+      options: {
+        keepGuess: true
+      },
+      requestFactory: () => freezeRegion(session.session_id, region),
+      title: "冻结区域"
+    });
+  }
+
   async function retryLastAction() {
     if (!lastFailedRequestRef.current) {
       return;
@@ -498,10 +530,12 @@ export function useGameSession(options?: { autoStepEnabled?: boolean }) {
     session,
     history,
     applyCard,
+    applyFreeze,
     advanceToNextLevel,
     login,
     logout,
     register,
+    submitFamilyCommit,
     retryLeaderboard: () => {
       void loadLeaderboard();
     },

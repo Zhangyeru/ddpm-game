@@ -15,6 +15,8 @@ from .schemas import (
     AuthResponse,
     AuthSessionSnapshot,
     AuthUser,
+    CommitFamilyRequest,
+    FreezeRequest,
     GuessRequest,
     LeaderboardEntry,
     LoginRequest,
@@ -213,6 +215,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             actor_id = resolve_actor_id(authorization, player_id)
             return game_service.use_card(actor_id, session_id, payload.card_id)
+        except AuthenticationError as error:
+            raise HTTPException(status_code=401, detail=str(error)) from error
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @app.post("/api/session/{session_id}/commit-family", response_model=SessionSnapshot)
+    def commit_family(
+        session_id: str,
+        payload: CommitFamilyRequest,
+        player_id: str | None = Header(default=None, alias="X-Player-Id"),
+        authorization: str | None = Header(default=None, alias="Authorization"),
+    ) -> SessionSnapshot:
+        try:
+            actor_id = resolve_actor_id(authorization, player_id)
+            return game_service.commit_family(actor_id, session_id, payload.family)
+        except AuthenticationError as error:
+            raise HTTPException(status_code=401, detail=str(error)) from error
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @app.post("/api/session/{session_id}/freeze", response_model=SessionSnapshot)
+    def freeze_session(
+        session_id: str,
+        payload: FreezeRequest,
+        player_id: str | None = Header(default=None, alias="X-Player-Id"),
+        authorization: str | None = Header(default=None, alias="Authorization"),
+    ) -> SessionSnapshot:
+        try:
+            actor_id = resolve_actor_id(authorization, player_id)
+            return game_service.freeze(actor_id, session_id, payload.region)
         except AuthenticationError as error:
             raise HTTPException(status_code=401, detail=str(error)) from error
         except KeyError as error:

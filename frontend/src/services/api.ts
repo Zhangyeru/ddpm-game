@@ -2,9 +2,11 @@ import type {
   AuthResponse,
   AuthSessionSnapshot,
   CardId,
+  FreezeRegionId,
   LeaderboardEntry,
   ProgressSnapshot,
-  SessionSnapshot
+  SessionSnapshot,
+  TargetFamily
 } from "../game/types";
 import { readAuthToken } from "./authStorage";
 
@@ -184,6 +186,26 @@ export function useCard(
   return request<SessionSnapshot>(`/session/${sessionId}/use-card`, {
     method: "POST",
     body: JSON.stringify({ card_id: cardId })
+  });
+}
+
+export function commitFamily(
+  sessionId: string,
+  family: TargetFamily
+): Promise<SessionSnapshot> {
+  return request<SessionSnapshot>(`/session/${sessionId}/commit-family`, {
+    method: "POST",
+    body: JSON.stringify({ family })
+  });
+}
+
+export function freezeRegion(
+  sessionId: string,
+  region: FreezeRegionId
+): Promise<SessionSnapshot> {
+  return request<SessionSnapshot>(`/session/${sessionId}/freeze`, {
+    method: "POST",
+    body: JSON.stringify({ region })
   });
 }
 

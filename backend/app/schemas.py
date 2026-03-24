@@ -6,8 +6,10 @@ from pydantic import BaseModel
 
 
 CardId = Literal["sharpen-outline", "mechanical-lens", "bio-scan"]
+TargetFamily = Literal["living", "machine", "structure"]
+FreezeRegionId = Literal["upper-left", "center", "lower-right"]
 GameStatus = Literal["playing", "won", "lost"]
-ScoreEventKind = Literal["card", "guess_penalty", "settlement", "loss"]
+ScoreEventKind = Literal["card", "guess_penalty", "settlement", "loss", "rule"]
 
 
 class GuessRequest(BaseModel):
@@ -26,6 +28,14 @@ class LoginRequest(BaseModel):
 
 class UseCardRequest(BaseModel):
     card_id: CardId
+
+
+class FreezeRequest(BaseModel):
+    region: FreezeRegionId
+
+
+class CommitFamilyRequest(BaseModel):
+    family: TargetFamily
 
 
 class CardOption(BaseModel):
@@ -114,11 +124,14 @@ class AuthSessionSnapshot(BaseModel):
 class SessionSnapshot(BaseModel):
     session_id: str
     level_id: str
+    rule_id: str
     chapter: int
     level: int
     chapter_title: str
     level_title: str
     level_summary: str
+    rule_summary: str
+    rule_badges: list[str]
     score: int
     combo: int
     status: GameStatus
@@ -131,16 +144,24 @@ class SessionSnapshot(BaseModel):
     progress: float
     image_url: str
     candidate_labels: list[str]
+    masked_candidates: list[str]
     remaining_guesses: int
     max_guesses: int
     cards_remaining: int
     max_cards: int
+    disabled_card_ids: list[CardId]
     hint: str
     events: list[str]
     card_options: list[CardOption]
     used_cards: list[CardId]
     revealed_target: str | None
     phase_label: str
+    objective_phase: Literal["standard", "classify", "identify"]
+    family_commit_required: bool
+    committed_family: TargetFamily | None
+    freeze_remaining: int
+    frozen_region: FreezeRegionId | None
+    rule_status: str | None
     mission_title: str
     threat_label: str
     step_interval_ms: int
