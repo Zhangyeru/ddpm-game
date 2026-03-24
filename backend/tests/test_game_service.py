@@ -7,6 +7,8 @@ from urllib.parse import parse_qs, urlparse
 
 from backend.app.gameplay_config import (
     GAME_CONFIG,
+    calculate_loss_breakdown,
+    calculate_score_breakdown,
     calculate_win_score,
     chapter_and_level_for_round,
     mission_for_round,
@@ -100,7 +102,7 @@ class GameServiceTest(unittest.TestCase):
 
         result = self.service.guess("player-a", snapshot.session_id, session.target.label)
 
-        expected_score = calculate_win_score(
+        expected_breakdown = calculate_score_breakdown(
             session.mission_type,
             progress=0,
             frames_remaining=snapshot.frames_remaining,
@@ -108,12 +110,63 @@ class GameServiceTest(unittest.TestCase):
             stability=snapshot.stability,
             corruption=snapshot.corruption,
             cards_remaining=snapshot.cards_remaining,
-            freeze_available=snapshot.freeze_available,
-            scan_charges=snapshot.scan_charges,
-            remaining_guesses=snapshot.remaining_guesses,
+            process_score_total=0,
         )
-        self.assertEqual(result.score, expected_score)
+        self.assertEqual(result.score, expected_breakdown.final_score)
         self.assertEqual(result.status, "won")
+        self.assertIsNotNone(result.score_breakdown)
+        self.assertEqual(result.score_breakdown.final_score, expected_breakdown.final_score)
+        self.assertEqual(result.score_breakdown.settlement_score, expected_breakdown.settlement_score)
+        self.assertEqual(result.score_events[-1].kind, "settlement")
+        self.assertEqual(result.score_events[-1].delta, expected_breakdown.settlement_score)
+        self.assertIsNotNone(result.ended_at)
+
+    def test_card_usage_appends_score_event(self) -> None:
+        snapshot = self.service.start_session("player-a")
+
+        result = self.service.use_card("player-a", snapshot.session_id, "sharpen-outline")
+
+        self.assertEqual(result.score, GAME_CONFIG.actions.sharpen_outline.score)
+        self.assertEqual(len(result.score_events), 1)
+        self.assertEqual(result.score_events[0].kind, "card")
+        self.assertEqual(result.score_events[0].title, "轮廓锐化")
+        self.assertEqual(result.score_events[0].delta, GAME_CONFIG.actions.sharpen_outline.score)
+        self.assertEqual(result.score_events[0].running_score, result.score)
+
+    def test_wrong_guess_appends_penalty_event(self) -> None:
+        snapshot = self.service.start_session("player-a")
+        session = self.service.sessions[snapshot.session_id]
+        wrong_label = next(
+            label for label in snapshot.candidate_labels if label != session.target.label
+        )
+
+        result = self.service.guess("player-a", snapshot.session_id, wrong_label)
+
+        self.assertEqual(result.score, GAME_CONFIG.actions.wrong_guess.score)
+        self.assertEqual(result.score_events[-1].kind, "guess_penalty")
+        self.assertEqual(result.score_events[-1].delta, GAME_CONFIG.actions.wrong_guess.score)
+        self.assertIn(wrong_label, result.score_events[-1].detail)
+
+    def test_loss_snapshot_includes_reason_and_score_history(self) -> None:
+        snapshot = self.service.start_session("player-a")
+        session = self.service.sessions[snapshot.session_id]
+        wrong_label = next(
+            label for label in snapshot.candidate_labels if label != session.target.label
+        )
+
+        for _ in range(GAME_CONFIG.resources.max_guesses):
+            result = self.service.guess("player-a", snapshot.session_id, wrong_label)
+
+        expected_process_score = GAME_CONFIG.actions.wrong_guess.score * GAME_CONFIG.resources.max_guesses
+        expected_breakdown = calculate_loss_breakdown(process_score_total=expected_process_score)
+
+        self.assertEqual(result.status, "lost")
+        self.assertEqual(result.loss_reason, "猜测次数耗尽。")
+        self.assertIsNotNone(result.score_breakdown)
+        self.assertEqual(result.score_breakdown.final_score, expected_breakdown.final_score)
+        self.assertEqual(result.score_events[-1].kind, "loss")
+        self.assertEqual(result.score_events[-1].delta, 0)
+        self.assertIsNotNone(result.ended_at)
 
     def test_sample_selection_stays_stable_within_session(self) -> None:
         snapshot = self.service.start_session("player-a")
@@ -122,7 +175,6 @@ class GameServiceTest(unittest.TestCase):
 
         self.service.step("player-a", snapshot.session_id)
         self.service.use_card("player-a", snapshot.session_id, "sharpen-outline")
-        self.service.freeze("player-a", snapshot.session_id, "center")
 
         self.assertEqual(self.service.sessions[snapshot.session_id].sample_id, initial_sample_id)
 

@@ -3,9 +3,13 @@ export type CardId =
   | "mechanical-lens"
   | "bio-scan";
 
-export type FreezeRegion = "upper-left" | "center" | "lower-right";
-
 export type GameStatus = "playing" | "won" | "lost";
+export type PendingActionKind = "start" | "step" | "guess" | "card";
+export type ScoreEventKind =
+  | "card"
+  | "guess_penalty"
+  | "settlement"
+  | "loss";
 
 export interface CardOption {
   id: CardId;
@@ -13,10 +17,25 @@ export interface CardOption {
   summary: string;
 }
 
-export interface FreezeRegionOption {
-  id: FreezeRegion;
+export interface ScoreBreakdown {
+  process_score_total: number;
+  base_score: number;
+  early_bonus: number;
+  time_bonus: number;
+  stability_bonus: number;
+  low_corruption_bonus: number;
+  mission_bonus: number;
+  card_penalty: number;
+  settlement_score: number;
+  final_score: number;
+}
+
+export interface ScoreEvent {
+  kind: ScoreEventKind;
   title: string;
-  summary: string;
+  delta: number;
+  running_score: number;
+  detail: string;
 }
 
 export interface SessionSnapshot {
@@ -30,7 +49,6 @@ export interface SessionSnapshot {
   seconds_remaining: number;
   stability: number;
   corruption: number;
-  scan_charges: number;
   frame_index: number;
   total_frames: number;
   progress: number;
@@ -38,18 +56,30 @@ export interface SessionSnapshot {
   candidate_labels: string[];
   remaining_guesses: number;
   cards_remaining: number;
-  freeze_available: boolean;
   hint: string;
   events: string[];
   card_options: CardOption[];
-  freeze_region_options: FreezeRegionOption[];
   used_cards: CardId[];
-  frozen_region: FreezeRegion | null;
   revealed_target: string | null;
-  signature_clue: string | null;
-  signature_revealed: boolean;
   phase_label: string;
   mission_title: string;
   threat_label: string;
   step_interval_ms: number;
+  score_breakdown: ScoreBreakdown | null;
+  score_events: ScoreEvent[];
+  loss_reason: string | null;
+  ended_at: string | null;
+}
+
+export interface ScoreHistoryEntry {
+  player_id: string;
+  session_id: string;
+  ended_at: string;
+  status: Exclude<GameStatus, "playing">;
+  revealed_target: string | null;
+  mission_title: string;
+  final_score: number;
+  score_breakdown: ScoreBreakdown | null;
+  score_events: ScoreEvent[];
+  loss_reason: string | null;
 }

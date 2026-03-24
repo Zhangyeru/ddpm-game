@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from .schemas import FreezeRequest, GuessRequest, SessionSnapshot, UseCardRequest
+from .schemas import GuessRequest, SessionSnapshot, UseCardRequest
 from .service import GameService
 from .settings import load_settings
 from .trajectory_store import TrajectoryStore
@@ -81,31 +81,6 @@ def use_card(
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-
-
-@app.post("/api/session/{session_id}/freeze", response_model=SessionSnapshot)
-def freeze_region(
-    session_id: str,
-    payload: FreezeRequest,
-    player_id: str | None = Header(default=None, alias="X-Player-Id"),
-) -> SessionSnapshot:
-    try:
-        return service.freeze(player_id, session_id, payload.region)
-    except KeyError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error)) from error
-
-
-@app.post("/api/session/{session_id}/pulse-scan", response_model=SessionSnapshot)
-def pulse_scan(
-    session_id: str,
-    player_id: str | None = Header(default=None, alias="X-Player-Id"),
-) -> SessionSnapshot:
-    try:
-        return service.pulse_scan(player_id, session_id)
-    except KeyError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @app.get("/api/session/{session_id}/frames/{frame_index}")

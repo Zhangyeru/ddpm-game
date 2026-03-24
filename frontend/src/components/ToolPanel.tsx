@@ -1,108 +1,91 @@
-import type {
-  CardId,
-  FreezeRegion,
-  SessionSnapshot
-} from "../game/types";
+import type { CardId, SessionSnapshot } from "../game/types";
+import type { PendingActionKind } from "../game/types";
+import {
+  CARD_TOOL_GUIDE,
+  RESOURCE_LIMITS
+} from "../content/gameGuide";
 
 type ToolPanelProps = {
+  busyAction: PendingActionKind | null;
   session: SessionSnapshot | null;
   disabled: boolean;
   onUseCard: (cardId: CardId) => void;
-  onFreeze: (region: FreezeRegion) => void;
-  onPulseScan: () => void;
 };
 
+const CARD_ORDER: readonly CardId[] = [
+  "sharpen-outline",
+  "mechanical-lens",
+  "bio-scan"
+];
+
 export function ToolPanel({
+  busyAction,
   session,
   disabled,
-  onUseCard,
-  onFreeze,
-  onPulseScan
+  onUseCard
 }: ToolPanelProps) {
+  const cardsRemaining = session?.cards_remaining ?? RESOURCE_LIMITS.cards;
+
   return (
     <section className="panel side-panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">干预工具</p>
-          <h2>工具架</h2>
+          <p className="eyebrow">唯一工具</p>
+          <h2>引导卡组</h2>
         </div>
+        <span className="tool-counter">
+          剩余 {cardsRemaining}/{RESOURCE_LIMITS.cards}
+        </span>
       </div>
 
-      <div className="tool-section">
-        <p className="section-label">主动技能</p>
-        <div className="tool-grid">
-          <button
-            className="tool-card tool-card--accent"
-            disabled={
-              disabled ||
-              !session ||
-              session.status !== "playing" ||
-              session.scan_charges <= 0
-            }
-            onClick={onPulseScan}
-            type="button"
-          >
-            <strong>脉冲扫描</strong>
-            <span>
-              暴露特征线索并缩小候选范围，但会拉高污染度。
-            </span>
-          </button>
-        </div>
-      </div>
+      <p className="tool-intro">
+        只保留卡牌干预。先看主体家族，再用最值得的那一张。
+      </p>
 
-      <div className="tool-section">
-        <p className="section-label">引导卡</p>
-        <div className="tool-grid">
-          {(session?.card_options ?? []).map((card) => {
-            const used = session?.used_cards.includes(card.id) ?? false;
-            const blocked =
-              disabled ||
-              !session ||
-              session.status !== "playing" ||
-              session.cards_remaining <= 0 ||
-              used;
+      <div className="tool-grid">
+        {CARD_ORDER.map((cardId) => {
+          const guide = CARD_TOOL_GUIDE[cardId];
+          const used = session?.used_cards.includes(cardId) ?? false;
+          const blocked =
+            disabled ||
+            !session ||
+            session.status !== "playing" ||
+            session.cards_remaining <= 0 ||
+            used;
 
-            return (
+          return (
+            <article
+              key={cardId}
+              className={`tool-card ${used ? "tool-card--used" : ""}`}
+            >
+              <div className="tool-card__header">
+                <strong>{guide.title}</strong>
+                <span className={`tool-badge ${used ? "tool-badge--used" : ""}`}>
+                  {used ? "已使用" : "可用"}
+                </span>
+              </div>
+              <p className="tool-card__summary">
+                {guide.effect}
+              </p>
+              <p className="tool-card__hint">{guide.cost}</p>
+              <p className="tool-card__hint tool-card__hint--secondary">
+                {guide.timing}
+              </p>
               <button
-                key={card.id}
-                className={`tool-card ${used ? "tool-card--used" : ""}`}
+                className="tool-card__action"
                 disabled={blocked}
-                onClick={() => onUseCard(card.id)}
+                onClick={() => onUseCard(cardId)}
                 type="button"
               >
-                <strong>{card.title}</strong>
-                <span>{card.summary}</span>
+                {used
+                  ? "本局已用"
+                  : busyAction === "card"
+                    ? "应用中..."
+                    : "立即使用"}
               </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="tool-section">
-        <p className="section-label">冻结区域</p>
-        <div className="tool-grid">
-          {(session?.freeze_region_options ?? []).map((regionOption) => {
-            const selected = session?.frozen_region === regionOption.id;
-            const blocked =
-              disabled ||
-              !session ||
-              session.status !== "playing" ||
-              !session.freeze_available;
-
-            return (
-              <button
-                key={regionOption.id}
-                className={`tool-card ${selected ? "tool-card--used" : ""}`}
-                disabled={blocked}
-                onClick={() => onFreeze(regionOption.id)}
-                type="button"
-              >
-                <strong>{regionOption.title}</strong>
-                <span>{regionOption.summary}</span>
-              </button>
-            );
-          })}
-        </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );

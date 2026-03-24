@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import type { CardId, FreezeRegion, SessionSnapshot } from "./types";
+import type {
+  CardId,
+  PendingActionKind,
+  ScoreHistoryEntry,
+  SessionSnapshot
+} from "./types";
 import {
-  freezeRegion,
-  pulseScan,
+  readScoreHistory,
+  saveFinishedSessionHistory
+} from "./scoreHistory";
+import {
+  getPlayerId,
   startSession,
   stepSession,
   submitGuess,
@@ -11,6 +19,18 @@ import {
 
 type SessionRequestOptions = {
   keepGuess?: boolean;
+};
+
+type SessionErrorState = {
+  detail: string;
+  title: string;
+};
+
+type SessionRequestDescriptor = {
+  kind: PendingActionKind;
+  requestFactory: () => Promise<SessionSnapshot>;
+  title: string;
+  options?: SessionRequestOptions;
 };
 
 function getErrorMessage(error: unknown): string {
@@ -22,12 +42,17 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function useGameSession() {
+  const playerIdRef = useRef(getPlayerId());
   const [session, setSession] = useState<SessionSnapshot | null>(null);
+  const [history, setHistory] = useState<ScoreHistoryEntry[]>(() =>
+    readScoreHistory(playerIdRef.current)
+  );
   const [selectedGuess, setSelectedGuess] = useState<string | null>(null);
-  const [pendingAction, setPendingAction] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingActionKind | null>(null);
+  const [error, setError] = useState<SessionErrorState | null>(null);
   const mountedRef = useRef(true);
   const requestSequenceRef = useRef(0);
+  const lastFailedRequestRef = useRef<SessionRequestDescriptor | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -38,25 +63,23 @@ export function useGameSession() {
     };
   }, []);
 
-  async function runSessionRequest(
-    requestFactory: () => Promise<SessionSnapshot>,
-    options?: SessionRequestOptions
-  ) {
+  async function runSessionRequest(descriptor: SessionRequestDescriptor) {
     const requestId = requestSequenceRef.current + 1;
     requestSequenceRef.current = requestId;
-    setPendingAction(true);
+    setPendingAction(descriptor.kind);
     setError(null);
 
     try {
-      const next = await requestFactory();
+      const next = await descriptor.requestFactory();
       if (!mountedRef.current || requestId !== requestSequenceRef.current) {
         return;
       }
 
+      lastFailedRequestRef.current = null;
       setSession(next);
       setSelectedGuess((current) => {
         if (
-          options?.keepGuess &&
+          descriptor.options?.keepGuess &&
           current &&
           next.candidate_labels.includes(current)
         ) {
@@ -78,10 +101,14 @@ export function useGameSession() {
         return;
       }
 
-      setError(getErrorMessage(requestError));
+      lastFailedRequestRef.current = descriptor;
+      setError({
+        detail: getErrorMessage(requestError),
+        title: `${descriptor.title}未完成`
+      });
     } finally {
       if (mountedRef.current && requestId === requestSequenceRef.current) {
-        setPendingAction(false);
+        setPendingAction(null);
       }
     }
   }
@@ -92,17 +119,34 @@ export function useGameSession() {
     }
 
     const timer = window.setTimeout(() => {
-      void runSessionRequest(() => stepSession(session.session_id), {
-        keepGuess: true
+      void runSessionRequest({
+        kind: "step",
+        options: {
+          keepGuess: true
+        },
+        requestFactory: () => stepSession(session.session_id),
+        title: "自动解码"
       });
     }, session.step_interval_ms);
 
     return () => window.clearTimeout(timer);
   }, [pendingAction, session]);
 
+  useEffect(() => {
+    if (!session || session.status === "playing" || !session.ended_at) {
+      return;
+    }
+
+    setHistory(saveFinishedSessionHistory(playerIdRef.current, session));
+  }, [session]);
+
   async function startRound() {
     setSelectedGuess(null);
-    await runSessionRequest(() => startSession());
+    await runSessionRequest({
+      kind: "start",
+      requestFactory: () => startSession(),
+      title: "启动扫描"
+    });
   }
 
   async function submitSelectedGuess() {
@@ -110,9 +154,11 @@ export function useGameSession() {
       return;
     }
 
-    await runSessionRequest(() =>
-      submitGuess(session.session_id, selectedGuess)
-    );
+    await runSessionRequest({
+      kind: "guess",
+      requestFactory: () => submitGuess(session.session_id, selectedGuess),
+      title: "提交猜测"
+    });
   }
 
   async function applyCard(cardId: CardId) {
@@ -120,46 +166,37 @@ export function useGameSession() {
       return;
     }
 
-    await runSessionRequest(() => useCard(session.session_id, cardId), {
-      keepGuess: true
-    });
-  }
-
-  async function applyFreeze(region: FreezeRegion) {
-    if (!session) {
-      return;
-    }
-
-    await runSessionRequest(
-      () => freezeRegion(session.session_id, region),
-      {
+    await runSessionRequest({
+      kind: "card",
+      options: {
         keepGuess: true
-      }
-    );
+      },
+      requestFactory: () => useCard(session.session_id, cardId),
+      title: "应用引导卡"
+    });
   }
 
-  async function runPulseScan() {
-    if (!session) {
+  async function retryLastAction() {
+    if (!lastFailedRequestRef.current) {
       return;
     }
 
-    await runSessionRequest(() => pulseScan(session.session_id), {
-      keepGuess: true
-    });
+    await runSessionRequest(lastFailedRequestRef.current);
   }
 
   return {
     controlsDisabled:
-      pendingAction || !session || session.status !== "playing",
+      pendingAction !== null || !session || session.status !== "playing",
     error,
     pendingAction,
     selectedGuess,
     session,
+    history,
     setSelectedGuess,
     applyCard,
-    applyFreeze,
-    runPulseScan,
     startRound,
-    submitSelectedGuess
+    submitSelectedGuess,
+    retryLastAction,
+    clearError: () => setError(null)
   };
 }

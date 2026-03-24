@@ -6,6 +6,7 @@ import random
 import time
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from threading import RLock
 from typing import Callable
 
@@ -13,33 +14,31 @@ from .frame_renderer import DEFAULT_TOTAL_FRAMES
 from .gameplay_config import (
     GAME_CONFIG,
     MissionType,
-    calculate_win_score,
+    ScoreBreakdownData,
+    calculate_loss_breakdown,
+    calculate_score_breakdown,
     card_effect,
     chapter_and_level_for_round,
     high_corruption_event_frames,
     mission_for_round,
     phase_label,
     progress_event_frames,
-    pulse_frame_cost,
     step_interval_ms,
     step_risk,
     threat_label,
 )
 from .game_data import (
     CARD_DEFINITIONS,
-    FREEZE_REGION_DEFINITIONS,
-    FREEZE_REGION_LABELS,
     TARGETS,
     TargetDefinition,
 )
-from .schemas import CardOption, FreezeRegionOption, SessionSnapshot
+from .schemas import CardOption, ScoreBreakdown, ScoreEvent, SessionSnapshot
 from .trajectory_store import FrameAsset, TrajectoryStore
 
 
 SESSION_TTL_SECONDS = GAME_CONFIG.presentation.session_ttl_seconds
 MAX_GUESSES = GAME_CONFIG.resources.max_guesses
 MAX_CARDS = GAME_CONFIG.resources.max_cards
-MAX_SCAN_CHARGES = GAME_CONFIG.resources.max_scan_charges
 MAX_STABILITY = GAME_CONFIG.resources.max_stability
 MAX_CORRUPTION = GAME_CONFIG.resources.max_corruption
 
@@ -62,18 +61,17 @@ class Session:
     frames_remaining: int = 0
     stability: float = 0.0
     corruption: float = 0.0
-    scan_charges: int = MAX_SCAN_CHARGES
     frame_index: int = 0
     total_frames: int = DEFAULT_TOTAL_FRAMES
     remaining_guesses: int = MAX_GUESSES
     cards_remaining: int = MAX_CARDS
-    freeze_available: bool = True
     hint: str = ""
-    signature_clue: str | None = None
-    signature_revealed: bool = False
     events: list[str] = field(default_factory=list)
     used_cards: list[str] = field(default_factory=list)
-    frozen_region: str | None = None
+    score_events: list[ScoreEvent] = field(default_factory=list)
+    score_breakdown: ScoreBreakdown | None = None
+    loss_reason: str | None = None
+    ended_at: str | None = None
     revealed_target: str | None = None
     last_touched_at: float = field(default_factory=time.monotonic)
 
@@ -105,14 +103,6 @@ class GameService:
                 summary=definition.summary,
             )
             for card_id, definition in CARD_DEFINITIONS.items()
-        )
-        self.freeze_region_options = tuple(
-            FreezeRegionOption(
-                id=region,
-                title=definition.title,
-                summary=definition.summary,
-            )
-            for region, definition in FREEZE_REGION_DEFINITIONS.items()
         )
         self._lock = RLock()
         if not self.targets:
@@ -157,12 +147,11 @@ class GameService:
                 corruption=GAME_CONFIG.initial_session.corruption,
                 total_frames=total_frames,
                 hint=target.hint,
-                signature_clue=target.signature,
                 events=[
                     "信号已锁定，遗物从原始噪声中开始显形。",
                     f"分类提示：{target.hint}。",
                     f"当前任务：{mission.title}。",
-                    "脉冲扫描已就绪，可用来缩小候选范围。",
+                    "引导卡已装填。先判断目标家族，再决定是否出手。",
                 ],
                 last_touched_at=self.clock(),
             )
@@ -210,7 +199,7 @@ class GameService:
 
             if guess == session.target.label:
                 progress = session.frame_index / max(session.total_frames - 1, 1)
-                session.score += calculate_win_score(
+                breakdown = calculate_score_breakdown(
                     session.mission_type,
                     progress=progress,
                     frames_remaining=session.frames_remaining,
@@ -218,13 +207,21 @@ class GameService:
                     stability=round(session.stability),
                     corruption=round(session.corruption),
                     cards_remaining=session.cards_remaining,
-                    freeze_available=session.freeze_available,
-                    scan_charges=session.scan_charges,
-                    remaining_guesses=session.remaining_guesses,
+                    process_score_total=session.score,
                 )
+                session.score = breakdown.final_score
                 session.combo = self._record_win(session.player_id)
                 session.status = "won"
                 session.revealed_target = session.target.label
+                session.score_breakdown = self._score_breakdown_model(breakdown)
+                session.ended_at = self._ended_at_iso()
+                self._append_score_event(
+                    session,
+                    kind="settlement",
+                    title="最终结算",
+                    delta=breakdown.settlement_score,
+                    detail=self._settlement_detail(breakdown),
+                )
                 self._append_event(
                     session,
                     f"识别正确，遗物确认为：{session.target.label}。",
@@ -232,11 +229,21 @@ class GameService:
                 return self._snapshot(session)
 
             session.remaining_guesses = max(0, session.remaining_guesses - 1)
-            session.score = max(0, session.score + GAME_CONFIG.actions.wrong_guess.score)
+            session.score += GAME_CONFIG.actions.wrong_guess.score
             self._shift_risk(
                 session,
                 stability_delta=GAME_CONFIG.actions.wrong_guess.stability,
                 corruption_delta=GAME_CONFIG.actions.wrong_guess.corruption,
+            )
+            self._append_score_event(
+                session,
+                kind="guess_penalty",
+                title="错误猜测",
+                delta=GAME_CONFIG.actions.wrong_guess.score,
+                detail=(
+                    f"提交 {guess} 失败。稳定度 {GAME_CONFIG.actions.wrong_guess.stability}，"
+                    f"污染 +{GAME_CONFIG.actions.wrong_guess.corruption}。"
+                ),
             )
             self._append_event(session, f"猜测错误：{guess}。信号再次变得不稳定。")
 
@@ -277,57 +284,17 @@ class GameService:
                 session,
                 f"已使用卡牌：{definition.title}。{definition.summary}{effect_text}",
             )
-
-            self._resolve_if_failed(session)
-            return self._snapshot(session)
-
-    def freeze(self, player_id: str | None, session_id: str, region: str) -> SessionSnapshot:
-        with self._lock:
-            session = self._get_session(player_id, session_id)
-            if session.status != "playing":
-                return self._snapshot(session)
-            if region not in FREEZE_REGION_LABELS:
-                raise ValueError("未知冻结区域。")
-            if not session.freeze_available:
-                return self._snapshot(session)
-
-            session.freeze_available = False
-            session.frozen_region = region
-            self._shift_risk(
+            self._append_score_event(
                 session,
-                stability_delta=GAME_CONFIG.actions.freeze.stability,
-                corruption_delta=GAME_CONFIG.actions.freeze.corruption,
-            )
-            self._append_event(
-                session,
-                f"区域已锁定：{FREEZE_REGION_LABELS[region]}。局部稳定度提升，但整体污染略有上升。",
-            )
-            self._resolve_if_failed(session)
-            return self._snapshot(session)
-
-    def pulse_scan(self, player_id: str | None, session_id: str) -> SessionSnapshot:
-        with self._lock:
-            session = self._get_session(player_id, session_id)
-            if session.status != "playing":
-                return self._snapshot(session)
-            if session.scan_charges <= 0:
-                return self._snapshot(session)
-
-            session.scan_charges -= 1
-            session.signature_revealed = True
-            session.frames_remaining = max(
-                0,
-                session.frames_remaining - pulse_frame_cost(session.total_frames),
-            )
-            self._shift_risk(
-                session,
-                stability_delta=GAME_CONFIG.actions.pulse_scan.stability,
-                corruption_delta=GAME_CONFIG.actions.pulse_scan.corruption,
-            )
-            session.candidate_labels = self._narrow_candidates(session)
-            self._append_event(
-                session,
-                f"脉冲扫描捕获特征线索：{session.signature_clue}。候选范围已收缩。",
+                kind="card",
+                title=definition.title,
+                delta=effect.score,
+                detail=self._card_score_detail(
+                    card_id=card_id,
+                    matched=matched,
+                    stability_delta=effect.stability,
+                    corruption_delta=effect.corruption,
+                ),
             )
 
             self._resolve_if_failed(session)
@@ -389,6 +356,25 @@ class GameService:
         if len(session.events) > 8:
             session.events = session.events[-8:]
 
+    def _append_score_event(
+        self,
+        session: Session,
+        *,
+        kind: str,
+        title: str,
+        delta: int,
+        detail: str,
+    ) -> None:
+        session.score_events.append(
+            ScoreEvent(
+                kind=kind,
+                title=title,
+                delta=delta,
+                running_score=session.score,
+                detail=detail,
+            )
+        )
+
     def _shift_risk(
         self,
         session: Session,
@@ -419,15 +405,27 @@ class GameService:
         self._record_loss(session.player_id)
         session.combo = 0
         session.status = "lost"
+        session.loss_reason = reason
+        session.score_breakdown = self._score_breakdown_model(
+            calculate_loss_breakdown(process_score_total=session.score)
+        )
+        session.ended_at = self._ended_at_iso()
         session.revealed_target = session.target.label
+        self._append_score_event(
+            session,
+            kind="loss",
+            title="本局失败",
+            delta=0,
+            detail=f"{reason} 隐藏目标是：{session.target.label}。",
+        )
         self._append_event(session, f"{reason} 隐藏目标是：{session.target.label}。")
 
     def _progress_message(self, session: Session) -> str:
         progress = session.frame_index / max(session.total_frames - 1, 1)
         if progress < 0.25:
-            return "噪声仍在主导画面，此时更适合收集风险和特征信息。"
+            return "噪声仍在主导画面，此时更适合观察谱带和主体轮廓。"
         if progress < 0.5:
-            return "主体轮廓开始浮出，可以考虑为后续抢答铺垫。"
+            return "主体轮廓开始浮出，可以判断目标家族并准备出卡。"
         if progress < 0.8:
             return "局部细节正在显影，错误决策会明显拉高污染度。"
         return "终局判断阶段已到来，越稳妥分数越低，越冒险收益越高。"
@@ -449,7 +447,6 @@ class GameService:
             seconds_remaining=round((session.frames_remaining * interval_ms) / 1000, 1),
             stability=stability_value,
             corruption=corruption_value,
-            scan_charges=session.scan_charges,
             frame_index=session.frame_index,
             total_frames=session.total_frames,
             progress=round(progress, 4),
@@ -457,20 +454,62 @@ class GameService:
             candidate_labels=session.candidate_labels,
             remaining_guesses=session.remaining_guesses,
             cards_remaining=session.cards_remaining,
-            freeze_available=session.freeze_available,
             hint=session.hint,
             events=session.events,
             card_options=list(self.card_options),
-            freeze_region_options=list(self.freeze_region_options),
             used_cards=session.used_cards,  # type: ignore[arg-type]
-            frozen_region=session.frozen_region,  # type: ignore[arg-type]
             revealed_target=session.revealed_target,
-            signature_clue=session.signature_clue if session.signature_revealed else None,
-            signature_revealed=session.signature_revealed,
             phase_label=self._phase_label(session),
             mission_title=session.mission_title,
             threat_label=self._threat_label(corruption_value),
             step_interval_ms=interval_ms,
+            score_breakdown=session.score_breakdown,
+            score_events=session.score_events,
+            loss_reason=session.loss_reason,
+            ended_at=session.ended_at,
+        )
+
+    def _score_breakdown_model(self, breakdown: ScoreBreakdownData) -> ScoreBreakdown:
+        return ScoreBreakdown(
+            process_score_total=breakdown.process_score_total,
+            base_score=breakdown.base_score,
+            early_bonus=breakdown.early_bonus,
+            time_bonus=breakdown.time_bonus,
+            stability_bonus=breakdown.stability_bonus,
+            low_corruption_bonus=breakdown.low_corruption_bonus,
+            mission_bonus=breakdown.mission_bonus,
+            card_penalty=breakdown.card_penalty,
+            settlement_score=breakdown.settlement_score,
+            final_score=breakdown.final_score,
+        )
+
+    def _card_score_detail(
+        self,
+        *,
+        card_id: str,
+        matched: bool,
+        stability_delta: float,
+        corruption_delta: float,
+    ) -> str:
+        stability_text = f"稳定 {'+' if stability_delta >= 0 else ''}{round(stability_delta)}"
+        corruption_text = f"污染 {'+' if corruption_delta >= 0 else ''}{round(corruption_delta)}"
+        if card_id == "sharpen-outline":
+            return f"通用稳像。{stability_text}，{corruption_text}。"
+        if matched:
+            return f"命中目标家族。{stability_text}，{corruption_text}。"
+        return f"未命中目标家族。{stability_text}，{corruption_text}，轨迹会偏向误导分支。"
+
+    def _settlement_detail(self, breakdown: ScoreBreakdownData) -> str:
+        return (
+            f"基础 {breakdown.base_score}，提前识别 {breakdown.early_bonus}，剩余时间 "
+            f"{breakdown.time_bonus}，稳定 {breakdown.stability_bonus}，低污染 "
+            f"{breakdown.low_corruption_bonus}，任务 {breakdown.mission_bonus}，"
+            f"卡牌惩罚 -{breakdown.card_penalty}。"
+        )
+
+    def _ended_at_iso(self) -> str:
+        return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+            "+00:00", "Z"
         )
 
     def _frame_url(self, session: Session, frame_index: int, variant_key: str) -> str:
@@ -493,12 +532,6 @@ class GameService:
     def _select_trajectory_variant(self, session: Session) -> str:
         if session.corruption >= GAME_CONFIG.presentation.corrupted_variant_threshold:
             return "corrupted"
-
-        if session.frozen_region is not None:
-            return f"freeze_{session.frozen_region.replace('-', '_')}"
-
-        if session.signature_revealed:
-            return "pulse_reveal"
 
         if "mechanical-lens" in session.used_cards and session.target.family in {
             "machine",
@@ -523,17 +556,6 @@ class GameService:
         if card_id == "bio-scan":
             return session.target.family == "living"
         return True
-
-    def _narrow_candidates(self, session: Session) -> list[str]:
-        if len(session.candidate_labels) <= 4:
-            return session.candidate_labels
-
-        rng = random.Random(f"{session.session_id}:pulse")
-        distractors = [label for label in session.candidate_labels if label != session.target.label]
-        trimmed = rng.sample(distractors, k=3)
-        narrowed = [session.target.label, *trimmed]
-        rng.shuffle(narrowed)
-        return narrowed
 
     def _phase_label(self, session: Session) -> str:
         progress = session.frame_index / max(session.total_frames - 1, 1)

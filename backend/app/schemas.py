@@ -6,8 +6,8 @@ from pydantic import BaseModel
 
 
 CardId = Literal["sharpen-outline", "mechanical-lens", "bio-scan"]
-FreezeRegion = Literal["upper-left", "center", "lower-right"]
 GameStatus = Literal["playing", "won", "lost"]
+ScoreEventKind = Literal["card", "guess_penalty", "settlement", "loss"]
 
 
 class GuessRequest(BaseModel):
@@ -18,20 +18,31 @@ class UseCardRequest(BaseModel):
     card_id: CardId
 
 
-class FreezeRequest(BaseModel):
-    region: FreezeRegion
-
-
 class CardOption(BaseModel):
     id: CardId
     title: str
     summary: str
 
 
-class FreezeRegionOption(BaseModel):
-    id: FreezeRegion
+class ScoreBreakdown(BaseModel):
+    process_score_total: int
+    base_score: int
+    early_bonus: int
+    time_bonus: int
+    stability_bonus: int
+    low_corruption_bonus: int
+    mission_bonus: int
+    card_penalty: int
+    settlement_score: int
+    final_score: int
+
+
+class ScoreEvent(BaseModel):
+    kind: ScoreEventKind
     title: str
-    summary: str
+    delta: int
+    running_score: int
+    detail: str
 
 
 class SessionSnapshot(BaseModel):
@@ -45,7 +56,6 @@ class SessionSnapshot(BaseModel):
     seconds_remaining: float
     stability: int
     corruption: int
-    scan_charges: int
     frame_index: int
     total_frames: int
     progress: float
@@ -53,17 +63,16 @@ class SessionSnapshot(BaseModel):
     candidate_labels: list[str]
     remaining_guesses: int
     cards_remaining: int
-    freeze_available: bool
     hint: str
     events: list[str]
     card_options: list[CardOption]
-    freeze_region_options: list[FreezeRegionOption]
     used_cards: list[CardId]
-    frozen_region: FreezeRegion | None
     revealed_target: str | None
-    signature_clue: str | None
-    signature_revealed: bool
     phase_label: str
     mission_title: str
     threat_label: str
     step_interval_ms: int
+    score_breakdown: ScoreBreakdown | None
+    score_events: list[ScoreEvent]
+    loss_reason: str | None
+    ended_at: str | None

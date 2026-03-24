@@ -97,16 +97,16 @@ export function GameCanvas({ session }: GameCanvasProps) {
           </strong>
         </div>
         <div>
-          <span className="readout-label">特征线索</span>
+          <span className="readout-label">当前任务</span>
           <strong>
-            {session?.signature_clue ?? "尚未进行脉冲扫描"}
+            {session?.mission_title ?? "等待任务分配"}
           </strong>
         </div>
         <div>
           <span className="readout-label">资源摘要</span>
           <strong>
             {session
-              ? `剩余 ${session.frames_remaining} 帧 / 猜测 ${session.remaining_guesses} / 卡牌 ${session.cards_remaining} / 脉冲 ${session.scan_charges}`
+              ? `剩余 ${session.frames_remaining} 帧 / 猜测 ${session.remaining_guesses} / 卡牌 ${session.cards_remaining}`
               : "--"}
           </strong>
         </div>

@@ -49,12 +49,6 @@ TRAJECTORY_VARIANTS: dict[str, TrajectoryVariant] = {
         inversion_guidance_scale=0.2,
         guidance_scale=2.0,
     ),
-    "pulse_reveal": TrajectoryVariant(
-        key="pulse_reveal",
-        prompt_suffix="crisp features, highly detailed, clearer edges",
-        inversion_guidance_scale=0.25,
-        guidance_scale=2.6,
-    ),
     "misguided": TrajectoryVariant(
         key="misguided",
         prompt_suffix="wrong semantic emphasis, misleading details",
@@ -70,26 +64,5 @@ TRAJECTORY_VARIANTS: dict[str, TrajectoryVariant] = {
         guidance_scale=1.6,
         corruption_noise_scale=0.03,
         corruption_noise_points=(0.2, 0.4, 0.6, 0.8),
-    ),
-    "freeze_upper_left": TrajectoryVariant(
-        key="freeze_upper_left",
-        inversion_guidance_scale=0.0,
-        guidance_scale=1.1,
-        frozen_region="upper-left",
-        reference_lead_steps=8,
-    ),
-    "freeze_center": TrajectoryVariant(
-        key="freeze_center",
-        inversion_guidance_scale=0.0,
-        guidance_scale=1.1,
-        frozen_region="center",
-        reference_lead_steps=10,
-    ),
-    "freeze_lower_right": TrajectoryVariant(
-        key="freeze_lower_right",
-        inversion_guidance_scale=0.0,
-        guidance_scale=1.1,
-        frozen_region="lower-right",
-        reference_lead_steps=8,
     ),
 }

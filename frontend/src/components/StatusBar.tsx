@@ -1,14 +1,19 @@
-import type { SessionSnapshot } from "../game/types";
+import type { PendingActionKind, SessionSnapshot } from "../game/types";
+import { describeLivePriority } from "../content/gameGuide";
 
 type StatusBarProps = {
+  busyAction: PendingActionKind | null;
+  historyCount: number;
+  onOpenHistory: () => void;
   session: SessionSnapshot | null;
-  busy: boolean;
   onStart: () => void;
 };
 
 export function StatusBar({
+  busyAction,
+  historyCount,
+  onOpenHistory,
   session,
-  busy,
   onStart
 }: StatusBarProps) {
   const statusKey = session?.status ?? "idle";
@@ -19,18 +24,24 @@ export function StatusBar({
         ? "已识别"
         : "失败"
     : "待机";
+  const leadCopy = session
+    ? describeLivePriority(session)
+    : "观察图像、谨慎出卡、尽早提交。完整规则保留在首页。";
 
   return (
     <header className="status-bar panel">
       <div className="title-block">
         <p className="eyebrow">DDPM 网页游戏原型</p>
         <h1>噪声考古学家</h1>
-        <p className="subtle-copy">
-          把去噪过程做成一场高风险的判断游戏。
-        </p>
-        <p className="mission-copy">
-          {session ? session.mission_title : "等待任务分配"}
-        </p>
+        <p className="subtle-copy">{leadCopy}</p>
+        <div className="title-chip-row">
+          <span className="title-chip">
+            {session ? session.mission_title : "完整规则页已就绪"}
+          </span>
+          <span className="title-chip title-chip--accent">
+            {session ? session.threat_label : "准备开始"}
+          </span>
+        </div>
       </div>
 
       <div className="stats-grid">
@@ -76,14 +87,27 @@ export function StatusBar({
         >
           {statusLabel}
         </span>
-        <button
-          className="action-button"
-          onClick={onStart}
-          disabled={busy}
-          type="button"
-        >
-          {session ? "重新开局" : "启动扫描"}
-        </button>
+        <div className="session-action-row">
+          <button
+            className="secondary-button"
+            onClick={onOpenHistory}
+            type="button"
+          >
+            历史记录 {historyCount > 0 ? `(${historyCount})` : ""}
+          </button>
+          <button
+            className="action-button"
+            onClick={onStart}
+            disabled={busyAction !== null}
+            type="button"
+          >
+            {busyAction === "start"
+              ? "启动中..."
+              : session
+                ? "重新开局"
+                : "启动扫描"}
+          </button>
+        </div>
       </div>
     </header>
   );

@@ -1,6 +1,5 @@
 import type {
   CardId,
-  FreezeRegion,
   SessionSnapshot
 } from "../game/types";
 
@@ -9,7 +8,7 @@ const API_BASE_URL =
 const API_ORIGIN = new URL(API_BASE_URL).origin;
 const PLAYER_ID_STORAGE_KEY = "noise-archaeologist-player-id";
 
-function getPlayerId(): string {
+export function getPlayerId(): string {
   try {
     const existing = window.localStorage.getItem(PLAYER_ID_STORAGE_KEY);
     if (existing) {
@@ -86,24 +85,6 @@ export function useCard(
   return request<SessionSnapshot>(`/session/${sessionId}/use-card`, {
     method: "POST",
     body: JSON.stringify({ card_id: cardId })
-  });
-}
-
-export function freezeRegion(
-  sessionId: string,
-  region: FreezeRegion
-): Promise<SessionSnapshot> {
-  return request<SessionSnapshot>(`/session/${sessionId}/freeze`, {
-    method: "POST",
-    body: JSON.stringify({ region })
-  });
-}
-
-export function pulseScan(
-  sessionId: string
-): Promise<SessionSnapshot> {
-  return request<SessionSnapshot>(`/session/${sessionId}/pulse-scan`, {
-    method: "POST"
   });
 }
 
