@@ -49,15 +49,15 @@ export function LeaderboardPanel({
               重试加载
             </button>
           }
-          detail={`${error} 你可以稍后重试，或先登录并完成一关。`}
-          eyebrow="排行榜不可用"
-          title="暂时无法读取总分排行"
+          detail={`${error} 你可以稍后再试，或先登录并完成一关，让成绩写入总榜。`}
+          eyebrow="总榜暂不可用"
+          title="眼下还无法读取总分排行"
         />
       ) : entries.length === 0 ? (
         <EmptyState
-          detail="本机还没有账号成绩。注册并完成至少一关后，这里就会出现总分排行。"
-          eyebrow="暂无排名"
-          title="还没有可展示的账号成绩"
+          detail="现在还没有账号成绩写入总榜。登录并完成至少一关后，这里就会出现排行。"
+          eyebrow="总榜未开"
+          title="这里还没有可显示的成绩"
         />
       ) : (
         <div className="leaderboard-list">

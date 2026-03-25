@@ -49,8 +49,8 @@ export function StatusBar({
   const leadCopy = session
     ? describeLivePriority(session)
     : progressLevel
-      ? `${progressLevel.summary} 当前任务：${progressLevel.mission_title}。`
-      : "观察图像、谨慎出卡、尽早提交。完整规则保留在首页。";
+      ? `${progressLevel.summary} 本关目标：${progressLevel.mission_title}。`
+      : "看清目标、谨慎出卡、尽早提交。详细规则见首页。";
   const actionLabel =
     busyAction === "start"
       ? "载入中..."
@@ -65,8 +65,8 @@ export function StatusBar({
   return (
     <header className="status-bar panel">
       <div className="title-block">
-        <p className="eyebrow">DDPM 网页游戏原型</p>
-        <h1>噪声考古学家</h1>
+        <p className="eyebrow">异象档案回收</p>
+        <h1>逆噪显影</h1>
         <p className="subtle-copy">{leadCopy}</p>
         <div className="title-chip-row">
           <span className="title-chip">
@@ -74,7 +74,7 @@ export function StatusBar({
               ? `${session.chapter_title} · ${session.level_title}`
               : progressLevel
                 ? `${progressLevel.chapter_title} · ${progressLevel.level_title}`
-                : "12 关线性闯关"}
+                : "12 关逐步推进"}
           </span>
           <span className="title-chip title-chip--accent">
             {session
@@ -84,7 +84,7 @@ export function StatusBar({
           {authUser ? (
             <span className="title-chip">{`已登录 · ${authUser.username}`}</span>
           ) : (
-            <span className="title-chip">游客模式</span>
+            <span className="title-chip">本地存档</span>
           )}
         </div>
       </div>
@@ -159,7 +159,7 @@ export function StatusBar({
               onClick={onOpenLeaderboard}
               type="button"
             >
-              {leaderboardOpen ? "返回主界面" : "总分排行榜"}
+              {leaderboardOpen ? "返回主界面" : "总分排行"}
             </button>
             <button
               className="secondary-button"

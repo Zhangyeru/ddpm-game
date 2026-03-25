@@ -14,7 +14,7 @@ export function InlineError({
   return (
     <section className="inline-error" role="alert">
       <div>
-        <p className="eyebrow">可恢复错误</p>
+        <p className="eyebrow">操作未完成</p>
         <strong className="inline-error__title">{title}</strong>
         {detail ? <p className="inline-error__detail">{detail}</p> : null}
       </div>

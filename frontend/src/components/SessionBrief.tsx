@@ -13,15 +13,15 @@ export function SessionBrief({ session }: SessionBriefProps) {
     <section className="panel side-panel session-brief">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">局势摘要</p>
-          <h2>当前重点</h2>
+          <p className="eyebrow">局面摘要</p>
+          <h2>此刻重点</h2>
         </div>
         <span className="tool-counter">{session.threat_label}</span>
       </div>
 
       <div className="brief-grid">
         <article className="brief-card">
-          <span className="readout-label">当前任务</span>
+          <span className="readout-label">本关目标</span>
           <strong>{session.mission_title}</strong>
           <p>{describeMissionFocus(session.mission_title)}</p>
         </article>

@@ -25,8 +25,8 @@ export function GuessPanel({
     <section className="panel guess-panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">候选目标</p>
-          <h2>猜测台</h2>
+          <p className="eyebrow">可选目标</p>
+          <h2>提交猜测</h2>
         </div>
         <span className="tool-counter">
           {busyAction === "guess" && selectedGuess

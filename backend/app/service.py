@@ -549,7 +549,7 @@ class GameService:
                 level_definition.summary,
                 f"规则：{level_definition.rule_summary}",
                 f"分类提示：{target.hint}。",
-                f"当前任务：{level_definition.mission_title}。",
+                f"本关目标：{level_definition.mission_title}。",
             ],
             last_touched_at=self.clock(),
         )
@@ -571,7 +571,7 @@ class GameService:
             session.next_level_id = None
             session.next_level_title = None
             session.next_level_summary = "已完成全部 12 关。你可以从第一关重新挑战整套档案。"
-            self._append_event(session, "终端审判完成，整套档案已归档。")
+            self._append_event(session, "最终归档完成，整套档案已封存。")
             self._save_campaign_progress(session.player_id, progress)
             return
 
@@ -843,7 +843,7 @@ class GameService:
         stability_text = f"稳定 {'+' if stability_delta >= 0 else ''}{round(stability_delta)}"
         corruption_text = f"污染 {'+' if corruption_delta >= 0 else ''}{round(corruption_delta)}"
         if card_id == "sharpen-outline":
-            return f"通用稳像。{stability_text}，{corruption_text}。"
+            return f"通用增强。{stability_text}，{corruption_text}。"
         if matched:
             return f"命中目标家族。{stability_text}，{corruption_text}。"
         return f"未命中目标家族。{stability_text}，{corruption_text}，轨迹会偏向误导分支。"
@@ -1114,7 +1114,7 @@ class GameService:
             return "阶段点会替换 1 个诱饵候选。"
         if session.level_rule_id == "single-card-contract":
             if not session.used_cards:
-                return "首次用卡将锁定本局唯一工具。"
+                return "首张卡会锁定本局剩余卡牌。"
             return f"契约卡：{CARD_DEFINITIONS[session.used_cards[0]].title}。"
         if session.level_rule_id == "noise-budget":
             return f"连续推进计数：{session.step_streak}。连续推进越多，额外污染越高。"

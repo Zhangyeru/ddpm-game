@@ -31,19 +31,19 @@ class FreezeRegionDefinition:
 CARD_DEFINITIONS: dict[str, CardDefinition] = {
     "sharpen-outline": CardDefinition(
         title="轮廓锐化",
-        summary="提供通用轮廓增强。",
+        summary="适合在尚未确认目标家族时稳定画面。",
         bonus_family=None,
         clarity_bonus=0.12,
     ),
     "mechanical-lens": CardDefinition(
         title="机械透镜",
-        summary="对机械体和建筑目标效果更强。",
+        summary="更适合车辆、器械和建筑目标。",
         bonus_family="machine",
         clarity_bonus=0.07,
     ),
     "bio-scan": CardDefinition(
         title="生物扫描",
-        summary="对生物类目标效果更强。",
+        summary="更适合动物与生物类目标。",
         bonus_family="living",
         clarity_bonus=0.07,
     ),
@@ -52,15 +52,15 @@ CARD_DEFINITIONS: dict[str, CardDefinition] = {
 
 FREEZE_REGION_DEFINITIONS: dict[str, FreezeRegionDefinition] = {
     "upper-left": FreezeRegionDefinition(
-        title="左上区域",
+        title="左上",
         summary="锁定画面的左上象限。",
     ),
     "center": FreezeRegionDefinition(
-        title="中央区域",
+        title="中央",
         summary="锁定最核心的主体轮廓。",
     ),
     "lower-right": FreezeRegionDefinition(
-        title="右下区域",
+        title="右下",
         summary="锁定画面的右下象限。",
     ),
 }

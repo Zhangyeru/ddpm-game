@@ -17,9 +17,9 @@ const CARD_ORDER: readonly CardId[] = [
 ];
 
 const CARD_FAMILY_LABEL: Record<CardId, string> = {
-  "sharpen-outline": "通用稳像",
+  "sharpen-outline": "通用",
   "mechanical-lens": "机械 / 建筑",
-  "bio-scan": "生物目标"
+  "bio-scan": "生物"
 };
 
 export function ToolPanel({
@@ -47,8 +47,8 @@ export function ToolPanel({
     <section className="panel side-panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">唯一工具</p>
-          <h2 className="tool-panel__title">引导卡组</h2>
+          <p className="eyebrow">卡牌工具</p>
+          <h2 className="tool-panel__title">可用卡牌</h2>
         </div>
         <span className="tool-counter">
           {session ? `剩余 ${cardsRemaining}/${maxCards}` : "等待开局"}

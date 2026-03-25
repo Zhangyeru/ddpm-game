@@ -84,13 +84,13 @@ export function ScorePanel({
         </div>
 
         <article className="result-card live-status-card">
-          <span className="readout-label">当前任务</span>
+          <span className="readout-label">本关目标</span>
           <strong>{session.mission_title}</strong>
           <p>{describeMissionFocus(session.mission_title)}</p>
         </article>
 
         <article className="result-card live-status-card">
-          <span className="readout-label">剩余资源</span>
+          <span className="readout-label">剩余窗口</span>
           <strong>
             {session.frames_remaining} 帧 / {session.remaining_guesses}/{session.max_guesses} 次猜测
           </strong>
@@ -137,7 +137,7 @@ export function ScorePanel({
       {session.status === "won" && session.awaiting_advancement ? (
         <section className="result-section">
           <div className="result-card result-card--action">
-            <span className="readout-label">下一关已解锁</span>
+            <span className="readout-label">已解锁下一关</span>
             <strong>{session.next_level_title ?? "下一关"}</strong>
             <p>{session.next_level_summary ?? "难度将继续提升。"}</p>
             <div className="result-actions">
@@ -167,7 +167,7 @@ export function ScorePanel({
           <div className="result-card result-card--action">
             <span className="readout-label">失败原因</span>
             <strong>{session.loss_reason ?? "本关失败"}</strong>
-            <p>进度不会后退。整理判断后，直接重试当前关。</p>
+            <p>进度不会后退。理清刚才错在何处，再回来重试这一关。</p>
             <div className="result-actions">
               <button
                 className="action-button"
@@ -185,8 +185,8 @@ export function ScorePanel({
       {session.campaign_complete ? (
         <section className="result-section">
           <div className="result-card result-card--action">
-            <span className="readout-label">整套完成</span>
-            <strong>12 关已全部归档</strong>
+            <span className="readout-label">全部通关</span>
+            <strong>十二卷档案已全部归档</strong>
             <p>{session.next_level_summary ?? "你可以从第一关重新挑战整套档案。"}</p>
             <div className="result-actions">
               <button
@@ -220,8 +220,8 @@ export function ScorePanel({
           </strong>
           <p>
             {session.level_best_improved
-              ? "这局刷新了当前关卡的最佳分。"
-              : "这局没有超过当前关卡的历史最佳。"}
+              ? "这一局刷新了本关的最高记录。"
+              : "这一局还没有超过本关的历史最高分。"}
           </p>
         </div>
       </section>
@@ -232,7 +232,7 @@ export function ScorePanel({
           <strong>最近 5 条</strong>
         </div>
         <ScoreEventList
-          emptyLabel="这局还没有触发任何分数变化。"
+          emptyLabel="这一局还没有留下分数变化记录。"
           events={session.score_events}
           limit={5}
         />

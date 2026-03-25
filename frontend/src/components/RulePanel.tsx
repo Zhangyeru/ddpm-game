@@ -55,8 +55,8 @@ export function RulePanel({
     <section className="panel side-panel rule-panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">关卡规则</p>
-          <h2 className="tool-panel__title">本关差异</h2>
+          <p className="eyebrow">本关规则</p>
+          <h2 className="tool-panel__title">规则提示</h2>
         </div>
         <span className="tool-counter">{session.rule_badges[0] ?? "规则已启用"}</span>
       </div>
@@ -73,14 +73,14 @@ export function RulePanel({
 
       {session.rule_status ? (
         <article className="result-card rule-panel__status">
-          <span className="readout-label">当前状态</span>
+          <span className="readout-label">规则状态</span>
           <strong>{session.rule_status}</strong>
         </article>
       ) : null}
 
       {canCommitFamily ? (
         <div className="rule-action-group">
-          <span className="readout-label">提交目标家族</span>
+          <span className="readout-label">先选目标家族</span>
           <div className="rule-action-grid">
             {FAMILY_OPTIONS.map((family) => (
               <button
@@ -99,7 +99,7 @@ export function RulePanel({
 
       {canFreeze ? (
         <div className="rule-action-group">
-          <span className="readout-label">冻结区域</span>
+          <span className="readout-label">选择冻结区域</span>
           <div className="rule-action-grid">
             {FREEZE_OPTIONS.map((region) => (
               <button

@@ -49,8 +49,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app = FastAPI(
-        title="Noise Archaeologist API",
-        description="Mock gameplay backend for the DDPM web game prototype.",
+        title="逆噪显影 API",
+        description="异象档案回收后端接口。",
     )
 
     app.add_middleware(

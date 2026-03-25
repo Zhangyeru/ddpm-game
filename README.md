@@ -1,4 +1,4 @@
-# Noise Archaeologist Prototype
+# 逆噪显影
 
 This repository now contains a playable scaffold for the DDPM web game concept from `DDPM_WEB_GAME_MVP.md`.
 

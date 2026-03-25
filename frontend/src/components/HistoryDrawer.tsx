@@ -75,7 +75,7 @@ export function HistoryDrawer({
           <input
             className="field__input"
             onChange={(event) => setSearchValue(event.target.value)}
-            placeholder="例如：猫、第二章、终端审判"
+            placeholder="例如：猫、第二章、最终归档"
             type="search"
             value={searchValue}
           />
@@ -127,9 +127,9 @@ export function HistoryDrawer({
 
       {history.length === 0 ? (
         <EmptyState
-          detail="完成第一局后，这里会保存本地回收记录，方便你按目标、任务和分数回看打法。"
-          eyebrow="历史为空"
-          title="还没有回收记录"
+          detail="完成第一局后，这里会留下最近的回收记录，方便你回看目标、任务和得分变化。"
+          eyebrow="暂无旧档"
+          title="这里还没有留下记录"
         />
       ) : filteredHistory.length === 0 ? (
         <EmptyState
@@ -148,9 +148,9 @@ export function HistoryDrawer({
               </button>
             ) : null
           }
-          detail="试试清空关键词、切回全部状态，或者按最近时间排序。"
-          eyebrow="没有匹配项"
-          title="当前条件下没有记录"
+          detail="试试清空关键词、切回全部状态，或者按最近时间重新查看。"
+          eyebrow="未找到匹配"
+          title="当前条件下没有可看的记录"
         />
       ) : (
         <div className="history-drawer-list">
@@ -188,7 +188,7 @@ export function HistoryDrawer({
               ) : null}
 
               <ScoreEventList
-                emptyLabel="这局没有记录到分数事件。"
+                emptyLabel="这一局没有留下分数变化记录。"
                 events={entry.score_events}
               />
             </details>

@@ -36,8 +36,8 @@ class GameplayConfigTest(unittest.TestCase):
     def test_level_lookup_returns_expected_tuning(self) -> None:
         level = level_by_id("chapter-3-level-2")
 
-        self.assertEqual(level.chapter_title, "第三章：高压回路")
-        self.assertEqual(level.level_title, "稳态压测")
+        self.assertEqual(level.chapter_title, "第三章：失稳边缘")
+        self.assertEqual(level.level_title, "连推风险")
         self.assertEqual(level.mission_type, "stability")
         self.assertEqual(level.candidate_count, 7)
         self.assertEqual(level.max_guesses, 2)

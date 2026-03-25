@@ -16,9 +16,9 @@ import {
 
 const CARD_ORDER = ["sharpen-outline", "mechanical-lens", "bio-scan"] as const;
 const CARD_FAMILY_LABEL: Record<(typeof CARD_ORDER)[number], string> = {
-  "sharpen-outline": "通用稳像",
+  "sharpen-outline": "通用",
   "mechanical-lens": "机械 / 建筑",
-  "bio-scan": "生物目标"
+  "bio-scan": "生物"
 };
 const QUICK_STEPS = [
   {
@@ -75,27 +75,27 @@ export function LandingGuide({
     <section className="landing-console">
       <div className="landing-column landing-column--main">
         <section className="panel landing-panel landing-panel--hero">
-          <p className="eyebrow">线性闯关</p>
+          <p className="eyebrow">逐关推进</p>
           <h2>
             {currentLevel
               ? `${currentLevel.chapter_title} · ${formatLevelCode(currentLevel.chapter, currentLevel.level)}`
-              : "观察图像，用对卡牌，在窗口关闭前完成识别"}
+              : "看清目标、用好卡牌，在窗口关闭前完成判定"}
           </h2>
           <p>
             {currentLevel?.summary ??
-              "目标会在去噪过程中逐渐显影。你要在稳定度被耗尽、污染度失控之前，用最少的卡牌判断答案并尽早提交。"}
+              "目标会在去噪过程中逐步显现。你要在稳定度被耗尽、污染失控之前，用尽量少的卡牌锁定答案。"}
           </p>
 
           <div className="hero-pill-row">
             <span className="hero-pill">
               {progression
                 ? `已完成 ${progression.completed_count}/${progression.total_levels}`
-                : "12 关线性推进"}
+                : "12 关逐步推进"}
             </span>
             <span className="hero-pill">
               {progression
                 ? `闯关总分 ${formatSignedScore(progression.campaign_total_score)}`
-                : "按各关最佳分累计总分"}
+                : "每关只记录最高分"}
             </span>
             <span className="hero-pill">
               {currentLevel ? `${currentLevel.candidate_count} 项候选` : "候选数量逐关提升"}
@@ -114,10 +114,10 @@ export function LandingGuide({
               <strong>{SCORE_FORMULA_LABEL}</strong>
               <p>
                 {progression?.campaign_complete
-                  ? "整套档案已通关。你可以从第一关重新挑战，并继续刷新自己的最佳打法。"
+                  ? "整套档案已经走通。你可以从第一关重新挑战，继续刷新自己的最好成绩。"
                   : currentLevel
-                    ? `当前任务：${currentLevel.mission_title}。`
-                    : "猜得早、状态稳、污染低、少用卡，才是高分局。"}
+                    ? `本关目标：${currentLevel.mission_title}。`
+                    : "猜得早、局面稳、污染低、少出卡，才是高分局。"}
               </p>
             </div>
 
@@ -132,7 +132,7 @@ export function LandingGuide({
           </div>
           <div className="landing-secondary-actions">
             <button className="secondary-button" onClick={onOpenLeaderboard} type="button">
-              查看总分排行榜
+              查看总分排行
             </button>
           </div>
         </section>
@@ -140,8 +140,8 @@ export function LandingGuide({
         <section className="panel landing-panel landing-panel--rules">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">规则与得分</p>
-              <h2>完整说明</h2>
+              <p className="eyebrow">玩法说明</p>
+              <h2>进入前先看</h2>
             </div>
             {currentLevel ? (
               <span className="tool-counter">{currentLevel.mission_title}</span>
@@ -186,8 +186,8 @@ export function LandingGuide({
         <section className="panel landing-panel landing-panel--cards">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">卡牌工具</p>
-              <h2>引导卡组</h2>
+              <p className="eyebrow">可用卡牌</p>
+              <h2>卡牌说明</h2>
             </div>
             <span className="tool-counter">
               {currentLevel ? `${currentLevel.max_cards} 张可用` : "按关卡发放"}
@@ -250,7 +250,7 @@ export function LandingGuide({
           <div className="panel-heading">
             <div>
               <p className="eyebrow">闯关进度</p>
-              <h2>先做这三步</h2>
+              <h2>开局三步</h2>
             </div>
             {progression ? (
               <span className="tool-counter">
