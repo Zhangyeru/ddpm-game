@@ -174,7 +174,28 @@ class GameService:
         with self._lock:
             self._prune_expired_sessions()
             progress = self._campaign_progress(player_key)
+            if progress.campaign_complete and progress.current_level_id != first_level().level_id:
+                progress.campaign_complete = False
+                self._save_campaign_progress(player_key, progress)
             level_definition = level_by_id(progress.current_level_id)
+            session = self._build_session(player_key, progress, level_definition)
+            self.sessions[session.session_id] = session
+            return self._snapshot(session)
+
+    def start_level(self, player_id: str | None, level_id: str) -> SessionSnapshot:
+        player_key = self._normalize_player_id(player_id)
+        with self._lock:
+            self._prune_expired_sessions()
+            progress = self._campaign_progress(player_key)
+            level_definition = level_by_id(level_id)
+            progress.current_level_id = level_definition.level_id
+            if (
+                self.level_indices[level_definition.level_id]
+                > self.level_indices[progress.highest_unlocked_level_id]
+            ):
+                progress.highest_unlocked_level_id = level_definition.level_id
+            progress.campaign_complete = False
+            self._save_campaign_progress(player_key, progress)
             session = self._build_session(player_key, progress, level_definition)
             self.sessions[session.session_id] = session
             return self._snapshot(session)
@@ -575,6 +596,8 @@ class GameService:
             self._save_campaign_progress(session.player_id, progress)
             return
 
+        progress.campaign_complete = False
+        session.campaign_complete = False
         session.awaiting_advancement = True
         session.next_level_id = upcoming.level_id
         session.next_level_title = upcoming.level_title
@@ -738,7 +761,9 @@ class GameService:
         )
 
     def _snapshot(self, session: Session) -> SessionSnapshot:
-        progress = session.frame_index / max(session.total_frames - 1, 1)
+        resolved = session.status != "playing"
+        display_frame_index = session.total_frames - 1 if resolved else session.frame_index
+        progress = 1.0 if resolved else session.frame_index / max(session.total_frames - 1, 1)
         variant_key = self._resolve_variant_key(session)
         stability_value = round(session.stability)
         corruption_value = round(session.corruption)
@@ -761,10 +786,10 @@ class GameService:
             seconds_remaining=round((session.frames_remaining * interval_ms) / 1000, 1),
             stability=stability_value,
             corruption=corruption_value,
-            frame_index=session.frame_index,
+            frame_index=display_frame_index,
             total_frames=session.total_frames,
             progress=round(progress, 4),
-            image_url=self._frame_url(session, session.frame_index, variant_key),
+            image_url=self._frame_url(session, display_frame_index, variant_key),
             candidate_labels=self._visible_candidate_labels(session),
             masked_candidates=[
                 label

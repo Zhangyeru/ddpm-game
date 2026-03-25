@@ -6,6 +6,7 @@ type GameCanvasProps = {
 };
 
 export function GameCanvas({ session }: GameCanvasProps) {
+  const revealMode = session?.status !== "playing";
   const progressPercent = session
     ? Math.round(session.progress * 100)
     : 0;
@@ -20,13 +21,15 @@ export function GameCanvas({ session }: GameCanvasProps) {
     <section className="panel canvas-panel">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">解码视图</p>
-          <h2>主画布</h2>
+          <p className="eyebrow">{revealMode ? "结果画面" : "解码视图"}</p>
+          <h2>{revealMode ? "答案揭示" : "主画布"}</h2>
         </div>
         {session ? (
           <div className="canvas-meta-group">
             <p className="canvas-meta">
-              帧 {session.frame_index + 1}/{session.total_frames}
+              {revealMode
+                ? `已揭示目标：${session.revealed_target ?? "未知目标"}`
+                : `帧 ${session.frame_index + 1}/${session.total_frames}`}
             </p>
           </div>
         ) : null}
@@ -38,9 +41,9 @@ export function GameCanvas({ session }: GameCanvasProps) {
             <img
               className="screen-image"
               src={resolveApiUrl(session.image_url)}
-              alt="去噪过程画面"
+              alt={revealMode ? "正确答案图像" : "去噪过程画面"}
             />
-            <div className="screen-overlay" />
+            {!revealMode ? <div className="screen-overlay" /> : null}
           </>
         ) : (
           <div className="screen-placeholder">

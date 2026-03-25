@@ -55,7 +55,7 @@ export function LeaderboardPanel({
         />
       ) : entries.length === 0 ? (
         <EmptyState
-          detail="现在还没有账号成绩写入总榜。登录并完成至少一关后，这里就会出现排行。"
+          detail="现在还没有账号成绩写入总榜。登录并完成至少一关后，这里就会出现第一批排行。"
           eyebrow="总榜未开"
           title="这里还没有可显示的成绩"
         />

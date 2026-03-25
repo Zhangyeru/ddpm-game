@@ -73,6 +73,18 @@ def test_progression_and_advance_endpoints_work() -> None:
         assert refreshed_progression.json()["campaign_total_score"] > 0
 
 
+def test_start_specific_level_endpoint_works() -> None:
+    with TemporaryDirectory() as temp_dir:
+        client, _ = make_test_client(temp_dir)
+        headers = {"X-Player-Id": "api-start-level-player"}
+
+        response = client.post("/api/session/start-level/chapter-3-level-2", headers=headers)
+
+        assert response.status_code == 200
+        assert response.json()["level_id"] == "chapter-3-level-2"
+        assert response.json()["level_title"] == "连推风险"
+
+
 def test_commit_family_and_freeze_endpoints_work() -> None:
     with TemporaryDirectory() as temp_dir:
         client, service = make_test_client(temp_dir)

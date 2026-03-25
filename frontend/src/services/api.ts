@@ -195,6 +195,14 @@ export function startCurrentLevel(): Promise<SessionSnapshot> {
   });
 }
 
+export function startSpecificLevel(
+  levelId: string
+): Promise<SessionSnapshot> {
+  return request<SessionSnapshot>(`/session/start-level/${levelId}`, {
+    method: "POST"
+  });
+}
+
 export function stepSession(
   sessionId: string
 ): Promise<SessionSnapshot> {

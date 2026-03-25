@@ -49,6 +49,7 @@ export default function App() {
     submitFamilyCommit,
     retryLastAction,
     retryLeaderboard,
+    startSelectedLevel,
     clearError
   } = useGameSession({ autoStepEnabled: page !== "leaderboard" });
 
@@ -141,6 +142,9 @@ export default function App() {
           progression={progression}
           onStart={() => {
             void startRound();
+          }}
+          onStartLevel={(levelId) => {
+            void startSelectedLevel(levelId);
           }}
         />
       ) : (

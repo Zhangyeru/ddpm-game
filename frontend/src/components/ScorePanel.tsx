@@ -139,7 +139,7 @@ export function ScorePanel({
           <div className="result-card result-card--action">
             <span className="readout-label">已解锁下一关</span>
             <strong>{session.next_level_title ?? "下一关"}</strong>
-            <p>{session.next_level_summary ?? "难度将继续提升。"}</p>
+            <p>{session.next_level_summary ?? "下一卷会更难，也更接近真相。"} </p>
             <div className="result-actions">
               <button
                 className="action-button"
@@ -167,7 +167,7 @@ export function ScorePanel({
           <div className="result-card result-card--action">
             <span className="readout-label">失败原因</span>
             <strong>{session.loss_reason ?? "本关失败"}</strong>
-            <p>进度不会后退。理清刚才错在何处，再回来重试这一关。</p>
+            <p>进度不会后退。理清刚才错在何处，再回来重试这一卷。</p>
             <div className="result-actions">
               <button
                 className="action-button"
@@ -187,7 +187,7 @@ export function ScorePanel({
           <div className="result-card result-card--action">
             <span className="readout-label">全部通关</span>
             <strong>十二卷档案已全部归档</strong>
-            <p>{session.next_level_summary ?? "你可以从第一关重新挑战整套档案。"}</p>
+            <p>{session.next_level_summary ?? "整套档案已经封存。你可以从第一关重新挑战。"} </p>
             <div className="result-actions">
               <button
                 className="action-button"

@@ -512,6 +512,48 @@ select {
   gap: 10px;
 }
 
+.level-progress-chapters {
+  display: grid;
+  gap: 14px;
+}
+
+.level-progress-chapter {
+  display: grid;
+  gap: 10px;
+}
+
+.level-progress-chapter__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 2px 0;
+}
+
+.level-progress-chapter__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.level-progress-chapter__header--current {
+  border-left: 3px solid rgba(114, 214, 201, 0.65);
+  padding-left: 10px;
+}
+
+.level-progress-chapter__header strong {
+  font-size: 1rem;
+}
+
+.level-progress-chapter__header p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.level-progress-chapter__toggle {
+  padding: 10px 14px;
+  flex-shrink: 0;
+}
+
 .landing-card {
   padding: 13px 14px;
   border-radius: var(--radius-card);
@@ -569,12 +611,22 @@ select {
 }
 
 .level-progress-card {
+  appearance: none;
+  text-align: left;
+  width: 100%;
   padding: 12px 13px;
   border-radius: var(--radius-card);
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.05);
   display: grid;
   gap: 6px;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+  position: relative;
 }
 
 .level-progress-card p,
@@ -586,18 +638,111 @@ select {
   color: var(--muted);
 }
 
+.level-progress-card__summary {
+  color: var(--text) !important;
+  line-height: 1.45;
+  font-size: 0.89rem;
+}
+
+.level-progress-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.level-progress-card__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--muted) !important;
+  font-size: 0.74rem;
+  line-height: 1;
+}
+
 .level-progress-score {
   color: var(--accent-strong);
   font-weight: 700;
 }
 
+.level-progress-score--muted {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.level-progress-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.level-progress-card__marker {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(114, 214, 201, 0.16);
+  border: 1px solid rgba(114, 214, 201, 0.28);
+  color: var(--text) !important;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.level-progress-card__action {
+  color: var(--text) !important;
+  font-weight: 700;
+}
+
+.level-progress-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(246, 189, 96, 0.28);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.14);
+}
+
+.level-progress-card:focus-visible {
+  outline: 2px solid rgba(246, 189, 96, 0.85);
+  outline-offset: 2px;
+}
+
 .level-progress-card--current {
-  border-color: rgba(114, 214, 201, 0.28);
-  background: rgba(114, 214, 201, 0.08);
+  border-color: rgba(114, 214, 201, 0.42);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(114, 214, 201, 0.12) 0%,
+      rgba(114, 214, 201, 0.05) 100%
+    );
+  box-shadow:
+    inset 0 0 0 1px rgba(114, 214, 201, 0.12),
+    0 12px 26px rgba(37, 123, 115, 0.12);
 }
 
 .level-progress-card--completed {
   border-color: rgba(246, 189, 96, 0.24);
+}
+
+.level-progress-card--busy {
+  opacity: 0.76;
+  cursor: progress;
+  transform: none !important;
+}
+
+.level-progress-header {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.level-progress-header p {
+  margin: 0;
+  color: var(--muted);
 }
 
 .landing-hero-footer {

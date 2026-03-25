@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type {
   AuthUser,
   PendingActionKind,
@@ -22,15 +23,15 @@ const CARD_FAMILY_LABEL: Record<(typeof CARD_ORDER)[number], string> = {
 };
 const QUICK_STEPS = [
   {
-    title: "先看主体",
-    detail: "先看轮廓和家族特征，不要把猜测当筛选器。"
+    title: "先看清主体",
+    detail: "先看轮廓和家族特征，不要把提交当成筛选器。"
   },
   {
     title: "再决定出卡",
-    detail: "卡牌数量随关卡变化。命中能稳住画面，用错会把轨迹带偏。"
+    detail: "卡牌数量会随关卡变化。命中能稳住画面，用错会把线索带偏。"
   },
   {
-    title: "能确认就提交",
+    title: "能确定就提交",
     detail: "继续等待会吃掉时间奖励，也可能把污染拖高。"
   }
 ] as const;
@@ -47,6 +48,7 @@ type LandingGuideProps = {
   onOpenLeaderboard: () => void;
   progression: ProgressSnapshot | null;
   onStart: () => void;
+  onStartLevel: (levelId: string) => void;
 };
 
 export function LandingGuide({
@@ -60,9 +62,31 @@ export function LandingGuide({
   onRegister,
   onOpenLeaderboard,
   progression,
-  onStart
+  onStart,
+  onStartLevel
 }: LandingGuideProps) {
   const currentLevel = progression?.current_level ?? null;
+  const groupedLevels = progression
+    ? progression.levels.reduce<Array<{
+        chapter: number;
+        chapterTitle: string;
+        levels: ProgressSnapshot["levels"];
+      }>>((groups, level) => {
+        const currentGroup = groups[groups.length - 1];
+        if (!currentGroup || currentGroup.chapter !== level.chapter) {
+          groups.push({
+            chapter: level.chapter,
+            chapterTitle: level.chapter_title,
+            levels: [level]
+          });
+          return groups;
+        }
+
+        currentGroup.levels.push(level);
+        return groups;
+      }, [])
+    : [];
+  const [expandedChapters, setExpandedChapters] = useState<Record<number, boolean>>({});
   const actionLabel = busy
     ? "正在建立扫描轨道..."
     : progression?.campaign_complete
@@ -70,6 +94,28 @@ export function LandingGuide({
       : progression?.completed_count
         ? "继续当前关"
         : "开始第一关";
+
+  useEffect(() => {
+    if (!groupedLevels.length) {
+      return;
+    }
+
+    setExpandedChapters((current) => {
+      const next = { ...current };
+      const targetChapter = currentLevel?.chapter ?? groupedLevels[0].chapter;
+      if (!(targetChapter in next)) {
+        next[targetChapter] = true;
+      }
+      return next;
+    });
+  }, [currentLevel?.chapter, groupedLevels]);
+
+  function toggleChapter(chapter: number) {
+    setExpandedChapters((current) => ({
+      ...current,
+      [chapter]: !current[chapter]
+    }));
+  }
 
   return (
     <section className="landing-console">
@@ -272,33 +318,110 @@ export function LandingGuide({
           </div>
 
           {progression ? (
-            <div className="level-progress-grid">
-              {progression.levels.map((level) => (
-                <article
-                  key={level.level_id}
-                  className={`level-progress-card ${
-                    level.is_current ? "level-progress-card--current" : ""
-                  } ${level.is_completed ? "level-progress-card--completed" : ""}`}
-                >
-                  <strong>{formatLevelCode(level.chapter, level.level)}</strong>
-                  <p>{level.level_title}</p>
-                  {level.best_score !== null ? (
-                    <span className="level-progress-score">
-                      {`最佳分 ${formatSignedScore(level.best_score)}`}
-                    </span>
-                  ) : null}
-                  <span>
-                    {level.is_current
-                      ? "当前关"
-                      : level.is_completed
-                        ? "已完成"
-                        : level.is_unlocked
-                          ? "已解锁"
-                          : "未解锁"}
-                  </span>
-                </article>
-              ))}
-            </div>
+            <>
+              <div className="level-progress-header">
+                <span className="readout-label">关卡列表</span>
+                <p>点击任意关卡卡片，直接进入对应关卡。</p>
+              </div>
+
+              <div className="level-progress-chapters">
+                {groupedLevels.map((group) => (
+                  <section className="level-progress-chapter" key={group.chapter}>
+                    <div
+                      className={`level-progress-chapter__header ${
+                        group.chapter === currentLevel?.chapter
+                          ? "level-progress-chapter__header--current"
+                          : ""
+                      }`}
+                    >
+                      <div className="level-progress-chapter__copy">
+                        <span className="readout-label">{`第 ${group.chapter} 章`}</span>
+                        <strong>{group.chapterTitle}</strong>
+                        <p>
+                          {`已完成 ${
+                            group.levels.filter((level) => level.is_completed).length
+                          }/${group.levels.length} 关${
+                            group.chapter === currentLevel?.chapter ? " · 当前章节" : ""
+                          }`}
+                        </p>
+                      </div>
+                      <button
+                        className="secondary-button level-progress-chapter__toggle"
+                        onClick={() => toggleChapter(group.chapter)}
+                        type="button"
+                      >
+                        {expandedChapters[group.chapter] ? "收起本章" : "展开本章"}
+                      </button>
+                    </div>
+
+                    {expandedChapters[group.chapter] ? (
+                      <div className="level-progress-grid">
+                        {group.levels.map((level) => (
+                          <button
+                            key={level.level_id}
+                            type="button"
+                            onClick={() => onStartLevel(level.level_id)}
+                            className={`level-progress-card ${
+                              level.is_current ? "level-progress-card--current" : ""
+                            } ${level.is_completed ? "level-progress-card--completed" : ""} ${
+                              busy ? "level-progress-card--busy" : ""
+                            }`}
+                            disabled={busy}
+                          >
+                            {level.is_current ? (
+                              <span className="level-progress-card__marker">当前选择</span>
+                            ) : null}
+                            <strong>{formatLevelCode(level.chapter, level.level)}</strong>
+                            <p>{level.level_title}</p>
+                            <div className="level-progress-card__chips">
+                              <span className="level-progress-card__chip">
+                                {level.mission_title.split("：")[0]}
+                              </span>
+                              <span className="level-progress-card__chip">
+                                {`${level.max_guesses} 次猜测`}
+                              </span>
+                              <span className="level-progress-card__chip">
+                                {`${level.max_cards} 张卡`}
+                              </span>
+                            </div>
+                            <span className="level-progress-card__summary">{level.summary}</span>
+                            {level.best_score !== null ? (
+                              <span className="level-progress-score">
+                                {`最佳分 ${formatSignedScore(level.best_score)}`}
+                              </span>
+                            ) : (
+                              <span className="level-progress-score level-progress-score--muted">
+                                尚无记录
+                              </span>
+                            )}
+                            <div className="level-progress-card__footer">
+                              <span>
+                                {level.is_current
+                                  ? "当前关"
+                                  : level.is_completed
+                                    ? "已完成"
+                                    : level.is_unlocked
+                                      ? "已解锁"
+                                      : "未解锁"}
+                              </span>
+                              <span className="level-progress-card__action">
+                                {busy
+                                  ? "载入中..."
+                                  : level.is_current
+                                    ? "继续此关"
+                                    : level.is_completed
+                                      ? "重新挑战"
+                                      : "点击进入"}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </section>
+                ))}
+              </div>
+            </>
           ) : (
             <div className="landing-mini-grid">
               {MISSION_GUIDES.map((mission) => (

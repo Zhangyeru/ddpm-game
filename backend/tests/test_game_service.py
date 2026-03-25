@@ -62,6 +62,27 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(snapshot.remaining_guesses, level.max_guesses)
         self.assertEqual(snapshot.cards_remaining, level.max_cards)
 
+    def test_start_current_level_clears_stale_campaign_complete_flag(self) -> None:
+        progress = self.service._campaign_progress("player-a")
+        progress.current_level_id = "chapter-3-level-2"
+        progress.highest_unlocked_level_id = "chapter-3-level-2"
+        progress.campaign_complete = True
+
+        snapshot = self.service.start_current_level("player-a")
+        refreshed = self.service.get_progression("player-a")
+
+        self.assertEqual(snapshot.level_id, "chapter-3-level-2")
+        self.assertFalse(refreshed.campaign_complete)
+
+    def test_start_level_starts_requested_level_and_updates_progress(self) -> None:
+        snapshot = self.service.start_level("player-a", "chapter-3-level-2")
+        progression = self.service.get_progression("player-a")
+
+        self.assertEqual(snapshot.level_id, "chapter-3-level-2")
+        self.assertEqual(snapshot.level_title, "连推风险")
+        self.assertEqual(progression.current_level_id, "chapter-3-level-2")
+        self.assertEqual(progression.highest_unlocked_level_id, "chapter-3-level-2")
+
     def test_progression_defaults_to_first_level(self) -> None:
         progression = self.service.get_progression("player-a")
 
@@ -115,6 +136,7 @@ class GameServiceTest(unittest.TestCase):
         session = self.service.sessions[snapshot.session_id]
 
         result = self.service.guess("player-a", snapshot.session_id, session.target.label)
+        image_url = urlparse(result.image_url)
 
         expected_breakdown = calculate_score_breakdown(
             session.mission_type,
@@ -139,6 +161,7 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(result.level_best_score, expected_breakdown.final_score)
         self.assertEqual(result.next_level_id, "chapter-1-level-2")
         self.assertIsNotNone(result.ended_at)
+        self.assertTrue(image_url.path.endswith(f"/frames/{result.total_frames - 1}"))
 
     def test_advance_unlocks_and_starts_next_level(self) -> None:
         snapshot = self.service.start_session("player-a")
@@ -267,6 +290,7 @@ class GameServiceTest(unittest.TestCase):
 
         for _ in range(session.max_guesses):
             result = self.service.guess("player-a", snapshot.session_id, wrong_label)
+        image_url = urlparse(result.image_url)
 
         expected_process_score = GAME_CONFIG.actions.wrong_guess.score * session.max_guesses
         expected_breakdown = calculate_loss_breakdown(process_score_total=expected_process_score)
@@ -279,6 +303,7 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(result.score_events[-1].delta, 0)
         self.assertFalse(result.awaiting_advancement)
         self.assertIsNotNone(result.ended_at)
+        self.assertTrue(image_url.path.endswith(f"/frames/{result.total_frames - 1}"))
 
     def test_sample_selection_stays_stable_within_session(self) -> None:
         snapshot = self.service.start_session("player-a")

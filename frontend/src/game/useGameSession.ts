@@ -26,6 +26,7 @@ import {
   loginUser,
   registerUser,
   startCurrentLevel,
+  startSpecificLevel,
   stepSession,
   submitGuess,
   useCard
@@ -389,6 +390,15 @@ export function useGameSession(options?: { autoStepEnabled?: boolean }) {
     });
   }
 
+  async function startSelectedLevel(levelId: string) {
+    setSelectedGuess(null);
+    await runSessionRequest({
+      kind: "start",
+      requestFactory: () => startSpecificLevel(levelId),
+      title: "进入指定关卡"
+    });
+  }
+
   async function advanceToNextLevel() {
     if (!session) {
       return;
@@ -540,6 +550,7 @@ export function useGameSession(options?: { autoStepEnabled?: boolean }) {
       void loadLeaderboard();
     },
     startRound,
+    startSelectedLevel,
     submitGuessChoice,
     retryLastAction,
     clearAuthError: () => setAuthError(null),

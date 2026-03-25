@@ -163,6 +163,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except AuthenticationError as error:
             raise HTTPException(status_code=401, detail=str(error)) from error
 
+    @app.post("/api/session/start-level/{level_id}", response_model=SessionSnapshot)
+    def start_level(
+        level_id: str,
+        player_id: str | None = Header(default=None, alias="X-Player-Id"),
+        authorization: str | None = Header(default=None, alias="Authorization"),
+    ) -> SessionSnapshot:
+        try:
+            actor_id = resolve_actor_id(authorization, player_id)
+            return game_service.start_level(actor_id, level_id)
+        except AuthenticationError as error:
+            raise HTTPException(status_code=401, detail=str(error)) from error
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
     @app.get("/api/progression", response_model=ProgressSnapshot)
     def get_progression(
         player_id: str | None = Header(default=None, alias="X-Player-Id"),
