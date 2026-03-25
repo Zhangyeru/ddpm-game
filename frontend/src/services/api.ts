@@ -16,6 +16,7 @@ const API_BASE_URL = normalizeBaseUrl(
 );
 const API_ORIGIN = resolveApiOrigin(API_BASE_URL);
 const PLAYER_ID_STORAGE_KEY = "noise-archaeologist-player-id";
+let inMemoryPlayerId: string | null = null;
 
 export class ApiError extends Error {
   status: number;
@@ -66,19 +67,52 @@ function resolveRequestUrl(path: string): string {
   return `${normalizedBase}${normalizedPath}`;
 }
 
+function generatePlayerId(): string {
+  try {
+    if (typeof window !== "undefined" && typeof window.crypto?.randomUUID === "function") {
+      return window.crypto.randomUUID();
+    }
+  } catch {
+    // Fall back to non-crypto ID generation below.
+  }
+
+  try {
+    if (typeof window !== "undefined" && typeof window.crypto?.getRandomValues === "function") {
+      const bytes = new Uint8Array(16);
+      window.crypto.getRandomValues(bytes);
+      return `anon-${Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("")}`;
+    }
+  } catch {
+    // Fall back to timestamp/random below.
+  }
+
+  return `anon-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 export function getPlayerId(): string {
   try {
     const existing = window.localStorage.getItem(PLAYER_ID_STORAGE_KEY);
     if (existing) {
       return existing;
     }
-
-    const next = window.crypto.randomUUID();
-    window.localStorage.setItem(PLAYER_ID_STORAGE_KEY, next);
-    return next;
   } catch {
-    return "anonymous";
+    // Continue with in-memory fallback.
   }
+
+  if (inMemoryPlayerId) {
+    return inMemoryPlayerId;
+  }
+
+  const next = generatePlayerId();
+  inMemoryPlayerId = next;
+
+  try {
+    window.localStorage.setItem(PLAYER_ID_STORAGE_KEY, next);
+  } catch {
+    // Keep using the in-memory ID for this page session.
+  }
+
+  return next;
 }
 
 async function request<T>(
