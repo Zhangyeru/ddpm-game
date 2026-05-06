@@ -188,7 +188,10 @@ class GameService:
             self._prune_expired_sessions()
             progress = self._campaign_progress(player_key)
             level_definition = level_by_id(level_id)
+
             progress.current_level_id = level_definition.level_id
+            # 跟踪最高解锁关卡用于UI显示，但不限制API访问
+            # 解锁限制由前端基于 is_unlocked 标志实施
             if (
                 self.level_indices[level_definition.level_id]
                 > self.level_indices[progress.highest_unlocked_level_id]

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { describeMissionFocus } from "../content/gameGuide";
 import { formatLevelCode } from "../game/levelPresentation";
 import { ScoreBreakdownGrid } from "./ScoreBreakdownGrid";
@@ -34,6 +35,13 @@ export function ScorePanel({
 }: ScorePanelProps) {
   const breakdown = session.score_breakdown;
   const isFinished = session.status !== "playing";
+  const [showVictoryEffect, setShowVictoryEffect] = useState(false);
+
+  useEffect(() => {
+    if (session.status === "won" && session.awaiting_advancement) {
+      setShowVictoryEffect(true);
+    }
+  }, [session.status, session.awaiting_advancement]);
 
   if (!isFinished) {
     return (
@@ -135,8 +143,8 @@ export function ScorePanel({
       </div>
 
       {session.status === "won" && session.awaiting_advancement ? (
-        <section className="result-section">
-          <div className="result-card result-card--action">
+        <section className={`result-section ${showVictoryEffect ? "result-section--victory" : ""}`}>
+          <div className={`result-card result-card--action result-card--victory`}>
             <span className="readout-label">已解锁下一关</span>
             <strong>{session.next_level_title ?? "下一关"}</strong>
             <p>{session.next_level_summary ?? "下一卷会更难，也更接近真相。"} </p>
@@ -163,8 +171,8 @@ export function ScorePanel({
       ) : null}
 
       {session.status === "lost" ? (
-        <section className="result-section">
-          <div className="result-card result-card--action">
+        <section className="result-section result-section--defeat">
+          <div className="result-card result-card--action result-card--defeat">
             <span className="readout-label">失败原因</span>
             <strong>{session.loss_reason ?? "本关失败"}</strong>
             <p>进度不会后退。理清刚才错在何处，再回来重试这一卷。</p>

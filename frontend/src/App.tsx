@@ -5,6 +5,7 @@ import { HistoryDrawer } from "./components/HistoryDrawer";
 import { InlineError } from "./components/InlineError";
 import { LandingGuide } from "./components/LandingGuide";
 import { LeaderboardPage } from "./components/LeaderboardPage";
+import { LevelTransitionCard } from "./components/LevelTransitionCard";
 import { LoadingRoundShell } from "./components/LoadingRoundShell";
 import { RulePanel } from "./components/RulePanel";
 import { ScorePanel } from "./components/ScorePanel";
@@ -21,6 +22,7 @@ function readAppPage(): AppPage {
 export default function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [page, setPage] = useState<AppPage>(() => readAppPage());
+  const [showTransition, setShowTransition] = useState(false);
   const {
     authBusyAction,
     authError,
@@ -62,6 +64,12 @@ export default function App() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
+  useEffect(() => {
+    if (session && progression?.current_level) {
+      setShowTransition(true);
+    }
+  }, [session?.session_id]);
+
   function openLeaderboard() {
     window.location.hash = "leaderboard";
   }
@@ -96,12 +104,20 @@ export default function App() {
         onLogout={() => {
           void logout();
         }}
+        onOpenHome={() => openHome()}
         onStart={() => {
           void startRound();
         }}
         progression={progression}
         session={session}
       />
+
+      {showTransition && session && progression?.current_level ? (
+        <LevelTransitionCard
+          level={progression.current_level}
+          onTransitionComplete={() => setShowTransition(false)}
+        />
+      ) : null}
 
       {error ? (
         <InlineError

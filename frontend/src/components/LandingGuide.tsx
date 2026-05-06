@@ -365,8 +365,8 @@ export function LandingGuide({
                               level.is_current ? "level-progress-card--current" : ""
                             } ${level.is_completed ? "level-progress-card--completed" : ""} ${
                               busy ? "level-progress-card--busy" : ""
-                            }`}
-                            disabled={busy}
+                            } ${!level.is_unlocked ? "level-progress-card--locked" : ""}`}
+                            disabled={busy || !level.is_unlocked}
                           >
                             {level.is_current ? (
                               <span className="level-progress-card__marker">当前选择</span>
@@ -407,11 +407,13 @@ export function LandingGuide({
                               <span className="level-progress-card__action">
                                 {busy
                                   ? "载入中..."
-                                  : level.is_current
-                                    ? "继续此关"
-                                    : level.is_completed
-                                      ? "重新挑战"
-                                      : "点击进入"}
+                                  : !level.is_unlocked
+                                    ? "请按顺序通关"
+                                    : level.is_current
+                                      ? "继续此关"
+                                      : level.is_completed
+                                        ? "重新挑战"
+                                        : "点击进入"}
                               </span>
                             </div>
                           </button>

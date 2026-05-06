@@ -17,6 +17,7 @@ type StatusBarProps = {
   onOpenLeaderboard: () => void;
   onOpenHistory: () => void;
   onLogout: () => void;
+  onOpenHome?: () => void;
   progression: ProgressSnapshot | null;
   session: SessionSnapshot | null;
   onStart: () => void;
@@ -31,6 +32,7 @@ export function StatusBar({
   onOpenLeaderboard,
   onOpenHistory,
   onLogout,
+  onOpenHome,
   progression,
   session,
   onStart
@@ -154,6 +156,15 @@ export function StatusBar({
         </span>
         <div className="session-action-row">
           <div className="session-nav-stack">
+            {session && onOpenHome ? (
+              <button
+                className="secondary-button"
+                onClick={onOpenHome}
+                type="button"
+              >
+                ← 返回首页
+              </button>
+            ) : null}
             <button
               className="secondary-button"
               onClick={onOpenLeaderboard}
