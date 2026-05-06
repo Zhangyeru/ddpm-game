@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { CardId, SessionSnapshot } from "../game/types";
 import type { PendingActionKind } from "../game/types";
 import { CARD_TOOL_GUIDE } from "../content/gameGuide";
@@ -22,7 +22,7 @@ const CARD_FAMILY_LABEL: Record<CardId, string> = {
   "bio-scan": "生物"
 };
 
-export function ToolPanel({
+export const ToolPanel = memo(function ToolPanel({
   busyAction,
   session,
   disabled,
@@ -129,4 +129,4 @@ export function ToolPanel({
       </div>
     </section>
   );
-}
+});

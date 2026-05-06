@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type {
   AuthUser,
   PendingActionKind,
@@ -51,7 +51,7 @@ type LandingGuideProps = {
   onStartLevel: (levelId: string) => void;
 };
 
-export function LandingGuide({
+export const LandingGuide = memo(function LandingGuide({
   authBusyAction,
   authError,
   authUser,
@@ -443,4 +443,4 @@ export function LandingGuide({
       </div>
     </section>
   );
-}
+});

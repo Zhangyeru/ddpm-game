@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { EmptyState } from "./EmptyState";
 import { formatSignedScore } from "../game/scorePresentation";
 import type { AuthUser, LeaderboardEntry } from "../game/types";
@@ -19,7 +19,7 @@ const LEADERBOARD_FILTERS: Array<{ label: string; value: LeaderboardFilter }> = 
   { label: "推进中", value: "active" }
 ];
 
-export function LeaderboardPanel({
+export const LeaderboardPanel = memo(function LeaderboardPanel({
   authUser,
   entries,
   error,
@@ -216,4 +216,4 @@ export function LeaderboardPanel({
       )}
     </section>
   );
-}
+});

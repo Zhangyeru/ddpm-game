@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import type { AuthUser, PendingActionKind, ProgressSnapshot } from "../game/types";
 import { formatLevelCode } from "../game/levelPresentation";
 import { formatSignedScore } from "../game/scorePresentation";
@@ -23,7 +23,7 @@ type ValidationErrors = {
 
 const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,20}$/;
 
-export function AuthPanel({
+export const AuthPanel = memo(function AuthPanel({
   authBusyAction,
   authError,
   authUser,
@@ -257,4 +257,4 @@ export function AuthPanel({
       </div>
     </section>
   );
-}
+});

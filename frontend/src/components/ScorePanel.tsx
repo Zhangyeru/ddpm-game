@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { describeMissionFocus } from "../content/gameGuide";
 import { formatLevelCode } from "../game/levelPresentation";
 import { ScoreBreakdownGrid } from "./ScoreBreakdownGrid";
@@ -24,7 +24,7 @@ type ScorePanelProps = {
   session: SessionSnapshot;
 };
 
-export function ScorePanel({
+export const ScorePanel = memo(function ScorePanel({
   busyAction,
   historyCount,
   onAdvance,
@@ -277,4 +277,4 @@ export function ScorePanel({
       </section>
     </section>
   );
-}
+});

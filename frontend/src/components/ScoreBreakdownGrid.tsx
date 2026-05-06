@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ScoreBreakdownItem } from "../game/scorePresentation";
 import { formatSignedScore } from "../game/scorePresentation";
 
@@ -7,7 +8,7 @@ type ScoreBreakdownGridProps = {
   summary?: boolean;
 };
 
-export function ScoreBreakdownGrid({
+export const ScoreBreakdownGrid = memo(function ScoreBreakdownGrid({
   compact = false,
   items,
   summary = false
@@ -26,4 +27,4 @@ export function ScoreBreakdownGrid({
       ))}
     </div>
   );
-}
+});

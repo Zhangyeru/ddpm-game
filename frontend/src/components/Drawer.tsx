@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { memo, useEffect } from "react";
 import type { ReactNode } from "react";
 
 type DrawerProps = {
@@ -8,7 +8,7 @@ type DrawerProps = {
   title: string;
 };
 
-export function Drawer({ children, onClose, open, title }: DrawerProps) {
+export const Drawer = memo(function Drawer({ children, onClose, open, title }: DrawerProps) {
   useEffect(() => {
     if (!open) {
       return;
@@ -57,4 +57,4 @@ export function Drawer({ children, onClose, open, title }: DrawerProps) {
       </section>
     </div>
   );
-}
+});

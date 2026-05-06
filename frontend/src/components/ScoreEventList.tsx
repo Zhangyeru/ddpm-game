@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ScoreEvent } from "../game/types";
 import { formatSignedScore } from "../game/scorePresentation";
 
@@ -7,7 +8,7 @@ type ScoreEventListProps = {
   limit?: number;
 };
 
-export function ScoreEventList({
+export const ScoreEventList = memo(function ScoreEventList({
   emptyLabel,
   events,
   limit
@@ -42,4 +43,4 @@ export function ScoreEventList({
       ))}
     </ul>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Drawer } from "./Drawer";
 import { EmptyState } from "./EmptyState";
 import { formatLevelCode } from "../game/levelPresentation";
@@ -31,7 +31,7 @@ const SORT_OPTIONS: Array<{ label: string; value: HistorySort }> = [
   { label: "分数优先", value: "score" }
 ];
 
-export function HistoryDrawer({
+export const HistoryDrawer = memo(function HistoryDrawer({
   history,
   onClose,
   open
@@ -310,4 +310,4 @@ export function HistoryDrawer({
       )}
     </Drawer>
   );
-}
+});

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ReactNode } from "react";
 
 type EmptyStateProps = {
@@ -7,7 +8,7 @@ type EmptyStateProps = {
   title: string;
 };
 
-export function EmptyState({
+export const EmptyState = memo(function EmptyState({
   action,
   detail,
   eyebrow,
@@ -21,4 +22,4 @@ export function EmptyState({
       {action ? <div className="empty-state__action">{action}</div> : null}
     </div>
   );
-}
+});

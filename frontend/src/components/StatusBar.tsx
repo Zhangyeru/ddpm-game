@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type {
   AuthUser,
   PendingActionKind,
@@ -23,7 +24,7 @@ type StatusBarProps = {
   onStart: () => void;
 };
 
-export function StatusBar({
+export const StatusBar = memo(function StatusBar({
   authBusyAction,
   authUser,
   busyAction,
@@ -202,4 +203,4 @@ export function StatusBar({
       </div>
     </header>
   );
-}
+});

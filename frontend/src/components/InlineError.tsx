@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 type InlineErrorProps = {
   detail?: string;
   onDismiss?: () => void;
@@ -5,7 +7,7 @@ type InlineErrorProps = {
   title: string;
 };
 
-export function InlineError({
+export const InlineError = memo(function InlineError({
   detail,
   onDismiss,
   onRetry,
@@ -32,4 +34,4 @@ export function InlineError({
       </div>
     </section>
   );
-}
+});

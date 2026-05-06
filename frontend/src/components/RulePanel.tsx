@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type {
   FreezeRegionId,
   PendingActionKind,
@@ -31,7 +32,7 @@ const FREEZE_OPTIONS: ReadonlyArray<{
   { id: "lower-right", label: "右下" }
 ];
 
-export function RulePanel({
+export const RulePanel = memo(function RulePanel({
   busyAction,
   disabled,
   onCommitFamily,
@@ -117,4 +118,4 @@ export function RulePanel({
       ) : null}
     </section>
   );
-}
+});

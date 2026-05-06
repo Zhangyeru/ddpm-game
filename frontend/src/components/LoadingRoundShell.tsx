@@ -1,4 +1,6 @@
-export function LoadingRoundShell() {
+import { memo } from "react";
+
+export const LoadingRoundShell = memo(function LoadingRoundShell() {
   return (
     <main className="console-grid console-grid--loading" aria-busy="true">
       <section className="panel side-panel skeleton-panel">
@@ -41,4 +43,4 @@ export function LoadingRoundShell() {
       </section>
     </main>
   );
-}
+});

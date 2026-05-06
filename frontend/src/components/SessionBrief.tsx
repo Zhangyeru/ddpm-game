@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   describeLivePriority,
   describeMissionFocus
@@ -8,7 +9,7 @@ type SessionBriefProps = {
   session: SessionSnapshot;
 };
 
-export function SessionBrief({ session }: SessionBriefProps) {
+export const SessionBrief = memo(function SessionBrief({ session }: SessionBriefProps) {
   return (
     <section className="panel side-panel session-brief">
       <div className="panel-heading">
@@ -43,4 +44,4 @@ export function SessionBrief({ session }: SessionBriefProps) {
       </div>
     </section>
   );
-}
+});

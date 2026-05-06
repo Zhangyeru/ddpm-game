@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { PendingActionKind } from "../game/types";
 
 type GuessPanelProps = {
@@ -10,7 +11,7 @@ type GuessPanelProps = {
   onGuess: (label: string) => void;
 };
 
-export function GuessPanel({
+export const GuessPanel = memo(function GuessPanel({
   busyAction,
   labels,
   selectedGuess,
@@ -63,4 +64,4 @@ export function GuessPanel({
       ) : null}
     </section>
   );
-}
+});

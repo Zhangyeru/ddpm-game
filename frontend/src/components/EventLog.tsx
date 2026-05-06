@@ -1,8 +1,10 @@
+import { memo } from "react";
+
 type EventLogProps = {
   events: string[];
 };
 
-export function EventLog({ events }: EventLogProps) {
+export const EventLog = memo(function EventLog({ events }: EventLogProps) {
   const visibleEvents = [...events].reverse().slice(0, 5);
 
   return (
@@ -30,4 +32,4 @@ export function EventLog({ events }: EventLogProps) {
       </ul>
     </section>
   );
-}
+});

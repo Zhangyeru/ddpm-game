@@ -1,3 +1,4 @@
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { SessionSnapshot } from "../game/types";
 import { resolveApiUrl } from "../services/api";
 
@@ -5,7 +6,7 @@ type GameCanvasProps = {
   session: SessionSnapshot | null;
 };
 
-export function GameCanvas({ session }: GameCanvasProps) {
+export const GameCanvas = memo(function GameCanvas({ session }: GameCanvasProps) {
   const revealMode = session?.status !== "playing";
   const progressPercent = session
     ? Math.round(session.progress * 100)
@@ -16,6 +17,35 @@ export function GameCanvas({ session }: GameCanvasProps) {
   const corruptionPercent = session
     ? Math.max(0, Math.min(100, session.corruption))
     : 0;
+  const [imageError, setImageError] = useState(false);
+  const preloadedRef = useRef<Set<string>>(new Set());
+
+  const imageUrl = session ? resolveApiUrl(session.image_url) : null;
+
+  useEffect(() => {
+    setImageError(false);
+  }, [imageUrl]);
+
+  useEffect(() => {
+    if (!session || revealMode) return;
+
+    const nextFrame = session.frame_index + 1;
+    if (nextFrame >= session.total_frames) return;
+
+    const nextUrl = imageUrl?.replace(
+      /frame_\d+/,
+      `frame_${String(nextFrame).padStart(4, "0")}`
+    );
+    if (!nextUrl || preloadedRef.current.has(nextUrl)) return;
+
+    preloadedRef.current.add(nextUrl);
+    const img = new Image();
+    img.src = nextUrl;
+  }, [session?.frame_index, session?.total_frames, imageUrl, revealMode, session]);
+
+  const handleImageError = useCallback(() => {
+    setImageError(true);
+  }, []);
 
   return (
     <section className="panel canvas-panel">
@@ -36,15 +66,21 @@ export function GameCanvas({ session }: GameCanvasProps) {
       </div>
 
       <div className="screen-frame">
-        {session ? (
+        {session && imageUrl && !imageError ? (
           <>
             <img
               className="screen-image"
-              src={resolveApiUrl(session.image_url)}
+              src={imageUrl}
               alt={revealMode ? "正确答案图像" : "去噪过程画面"}
+              onError={handleImageError}
             />
             {!revealMode ? <div className="screen-overlay" /> : null}
           </>
+        ) : session && imageError ? (
+          <div className="screen-placeholder">
+            <p>图像加载失败。</p>
+            <span>请检查网络连接后重试本关。</span>
+          </div>
         ) : (
           <div className="screen-placeholder">
             <p>当前没有进行中的扫描。</p>
@@ -88,4 +124,4 @@ export function GameCanvas({ session }: GameCanvasProps) {
       </div>
     </section>
   );
-}
+});

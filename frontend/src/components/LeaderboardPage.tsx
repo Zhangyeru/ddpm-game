@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { LeaderboardPanel } from "./LeaderboardPanel";
 import { formatSignedScore } from "../game/scorePresentation";
 import type { AuthUser, LeaderboardEntry, ProgressSnapshot } from "../game/types";
@@ -12,7 +13,7 @@ type LeaderboardPageProps = {
   progression: ProgressSnapshot | null;
 };
 
-export function LeaderboardPage({
+export const LeaderboardPage = memo(function LeaderboardPage({
   authUser,
   entries,
   error,
@@ -97,4 +98,4 @@ export function LeaderboardPage({
       </div>
     </section>
   );
-}
+});

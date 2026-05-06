@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { GameCanvas } from "./components/GameCanvas";
 import { GuessPanel } from "./components/GuessPanel";
-import { HistoryDrawer } from "./components/HistoryDrawer";
 import { InlineError } from "./components/InlineError";
-import { LandingGuide } from "./components/LandingGuide";
-import { LeaderboardPage } from "./components/LeaderboardPage";
-import { LevelTransitionCard } from "./components/LevelTransitionCard";
 import { LoadingRoundShell } from "./components/LoadingRoundShell";
 import { RulePanel } from "./components/RulePanel";
 import { ScorePanel } from "./components/ScorePanel";
 import { StatusBar } from "./components/StatusBar";
 import { ToolPanel } from "./components/ToolPanel";
 import { useGameSession } from "./game/useGameSession";
+
+const HistoryDrawer = lazy(() => import("./components/HistoryDrawer").then((m) => ({ default: m.HistoryDrawer })));
+const LandingGuide = lazy(() => import("./components/LandingGuide").then((m) => ({ default: m.LandingGuide })));
+const LeaderboardPage = lazy(() => import("./components/LeaderboardPage").then((m) => ({ default: m.LeaderboardPage })));
+const LevelTransitionCard = lazy(() => import("./components/LevelTransitionCard").then((m) => ({ default: m.LevelTransitionCard })));
 
 type AppPage = "home" | "leaderboard";
 
@@ -124,10 +125,12 @@ export default function App() {
       />
 
       {showTransition && session ? (
-        <LevelTransitionCard
-          session={session}
-          onTransitionComplete={closeTransition}
-        />
+        <Suspense fallback={null}>
+          <LevelTransitionCard
+            session={session}
+            onTransitionComplete={closeTransition}
+          />
+        </Suspense>
       ) : null}
 
       {error ? (
@@ -142,38 +145,42 @@ export default function App() {
       ) : null}
 
       {page === "leaderboard" ? (
-        <LeaderboardPage
-          authUser={authUser}
-          entries={leaderboard}
-          error={leaderboardError}
-          loading={leaderboardLoading}
-          onBack={openHome}
-          onRetry={() => {
-            void retryLeaderboard();
-          }}
-          progression={progression}
-        />
+        <Suspense fallback={<LoadingRoundShell />}>
+          <LeaderboardPage
+            authUser={authUser}
+            entries={leaderboard}
+            error={leaderboardError}
+            loading={leaderboardLoading}
+            onBack={openHome}
+            onRetry={() => {
+              void retryLeaderboard();
+            }}
+            progression={progression}
+          />
+        </Suspense>
       ) : !session && (pendingAction === "start" || progressionLoading) ? (
         <LoadingRoundShell />
       ) : !session ? (
-        <LandingGuide
-          authBusyAction={authBusyAction}
-          authError={authError}
-          authUser={authUser}
-          busy={pendingAction === "start"}
-          onClearAuthError={clearAuthError}
-          onLogin={login}
-          onLogout={logout}
-          onOpenLeaderboard={openLeaderboard}
-          onRegister={register}
-          progression={progression}
-          onStart={() => {
-            void startRound();
-          }}
-          onStartLevel={(levelId) => {
-            void startSelectedLevel(levelId);
-          }}
-        />
+        <Suspense fallback={<LoadingRoundShell />}>
+          <LandingGuide
+            authBusyAction={authBusyAction}
+            authError={authError}
+            authUser={authUser}
+            busy={pendingAction === "start"}
+            onClearAuthError={clearAuthError}
+            onLogin={login}
+            onLogout={logout}
+            onOpenLeaderboard={openLeaderboard}
+            onRegister={register}
+            progression={progression}
+            onStart={() => {
+              void startRound();
+            }}
+            onStartLevel={(levelId) => {
+              void startSelectedLevel(levelId);
+            }}
+          />
+        </Suspense>
       ) : (
         <main className="console-grid">
           <div className="console-stack console-stack--left">
@@ -231,11 +238,15 @@ export default function App() {
         </main>
       )}
 
-      <HistoryDrawer
-        history={history}
-        onClose={() => setHistoryOpen(false)}
-        open={historyOpen}
-      />
+      {historyOpen ? (
+        <Suspense fallback={null}>
+          <HistoryDrawer
+            history={history}
+            onClose={() => setHistoryOpen(false)}
+            open={historyOpen}
+          />
+        </Suspense>
+      ) : null}
     </div>
   );
 }

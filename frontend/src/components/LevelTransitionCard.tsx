@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type { SessionSnapshot } from "../game/types";
 
 const TRANSITION_VISIBLE_MS = 2000;
@@ -19,7 +19,7 @@ type LevelTransitionCardProps = {
   onTransitionComplete: () => void;
 };
 
-export function LevelTransitionCard({
+export const LevelTransitionCard = memo(function LevelTransitionCard({
   session,
   onTransitionComplete
 }: LevelTransitionCardProps) {
@@ -100,4 +100,4 @@ export function LevelTransitionCard({
       </div>
     </div>
   );
-}
+});
