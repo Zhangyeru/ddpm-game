@@ -74,7 +74,10 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(snapshot.level_id, "chapter-3-level-2")
         self.assertFalse(refreshed.campaign_complete)
 
-    def test_start_level_starts_requested_level_and_updates_progress(self) -> None:
+    def test_start_level_starts_unlocked_requested_level_and_updates_progress(self) -> None:
+        progress = self.service._campaign_progress("player-a")
+        progress.highest_unlocked_level_id = "chapter-3-level-2"
+
         snapshot = self.service.start_level("player-a", "chapter-3-level-2")
         progression = self.service.get_progression("player-a")
 
@@ -82,6 +85,14 @@ class GameServiceTest(unittest.TestCase):
         self.assertEqual(snapshot.level_title, "连推风险")
         self.assertEqual(progression.current_level_id, "chapter-3-level-2")
         self.assertEqual(progression.highest_unlocked_level_id, "chapter-3-level-2")
+
+    def test_start_level_rejects_locked_level(self) -> None:
+        with self.assertRaises(ValueError):
+            self.service.start_level("player-a", "chapter-3-level-2")
+
+        progression = self.service.get_progression("player-a")
+        self.assertEqual(progression.current_level_id, "chapter-1-level-1")
+        self.assertEqual(progression.highest_unlocked_level_id, "chapter-1-level-1")
 
     def test_progression_defaults_to_first_level(self) -> None:
         progression = self.service.get_progression("player-a")

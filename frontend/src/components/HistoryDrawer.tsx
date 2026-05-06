@@ -39,6 +39,9 @@ export function HistoryDrawer({
   const [searchValue, setSearchValue] = useState("");
   const [statusFilter, setStatusFilter] = useState<HistoryFilter>("all");
   const [sortBy, setSortBy] = useState<HistorySort>("recent");
+  const [expandedSessionIds, setExpandedSessionIds] = useState<Set<string>>(
+    () => new Set()
+  );
 
   const filteredHistory = useMemo(() => {
     const normalizedSearch = searchValue.trim().toLowerCase();
@@ -66,6 +69,62 @@ export function HistoryDrawer({
   }, [history, searchValue, sortBy, statusFilter]);
 
   const hasFilters = searchValue.trim().length > 0 || statusFilter !== "all" || sortBy !== "recent";
+  const filteredExpandedCount = filteredHistory.filter((entry) =>
+    expandedSessionIds.has(entry.session_id)
+  ).length;
+  const allFilteredExpanded =
+    filteredHistory.length > 0 &&
+    filteredExpandedCount === filteredHistory.length;
+  const historyStats = useMemo(() => {
+    if (history.length === 0) {
+      return {
+        averageScore: null,
+        bestScore: null,
+        lostCount: 0,
+        wonCount: 0
+      };
+    }
+
+    const wonCount = history.filter((entry) => entry.status === "won").length;
+    const totalScore = history.reduce((sum, entry) => sum + entry.final_score, 0);
+    const bestScore = history.reduce(
+      (best, entry) => Math.max(best, entry.final_score),
+      history[0].final_score
+    );
+
+    return {
+      averageScore: Math.round(totalScore / history.length),
+      bestScore,
+      lostCount: history.length - wonCount,
+      wonCount
+    };
+  }, [history]);
+
+  function toggleEntry(sessionId: string, open: boolean) {
+    setExpandedSessionIds((current) => {
+      const next = new Set(current);
+      if (open) {
+        next.add(sessionId);
+      } else {
+        next.delete(sessionId);
+      }
+      return next;
+    });
+  }
+
+  function setFilteredEntriesOpen(open: boolean) {
+    setExpandedSessionIds((current) => {
+      const next = new Set(current);
+      filteredHistory.forEach((entry) => {
+        if (open) {
+          next.add(entry.session_id);
+        } else {
+          next.delete(entry.session_id);
+        }
+      });
+      return next;
+    });
+  }
 
   return (
     <Drawer onClose={onClose} open={open} title="最近 10 局回收记录">
@@ -118,11 +177,60 @@ export function HistoryDrawer({
         </div>
       </section>
 
+      {history.length > 0 ? (
+        <section className="history-stat-grid">
+          <article className="history-stat-card">
+            <span className="readout-label">成功</span>
+            <strong>{historyStats.wonCount}</strong>
+          </article>
+          <article className="history-stat-card">
+            <span className="readout-label">失败</span>
+            <strong>{historyStats.lostCount}</strong>
+          </article>
+          <article className="history-stat-card">
+            <span className="readout-label">最高分</span>
+            <strong>
+              {historyStats.bestScore === null
+                ? "--"
+                : formatSignedScore(historyStats.bestScore)}
+            </strong>
+          </article>
+          <article className="history-stat-card">
+            <span className="readout-label">平均分</span>
+            <strong>
+              {historyStats.averageScore === null
+                ? "--"
+                : formatSignedScore(historyStats.averageScore)}
+            </strong>
+          </article>
+        </section>
+      ) : null}
+
       <div className="drawer-summary-row">
-        <span className="tool-counter">共 {history.length} 局</span>
-        <span className="subtle-copy">
-          当前结果：{filteredHistory.length} 条
-        </span>
+        <div className="drawer-summary-copy">
+          <span className="tool-counter">共 {history.length} 局</span>
+          <span className="subtle-copy">
+            当前结果：{filteredHistory.length} 条
+          </span>
+        </div>
+        <div className="history-quick-actions">
+          <button
+            className="secondary-button compact-button"
+            disabled={filteredHistory.length === 0 || allFilteredExpanded}
+            onClick={() => setFilteredEntriesOpen(true)}
+            type="button"
+          >
+            全部展开
+          </button>
+          <button
+            className="secondary-button compact-button"
+            disabled={filteredExpandedCount === 0}
+            onClick={() => setFilteredEntriesOpen(false)}
+            type="button"
+          >
+            全部收起
+          </button>
+        </div>
       </div>
 
       {history.length === 0 ? (
@@ -155,7 +263,12 @@ export function HistoryDrawer({
       ) : (
         <div className="history-drawer-list">
           {filteredHistory.map((entry) => (
-            <details className="history-item history-item--drawer" key={entry.session_id}>
+            <details
+              className="history-item history-item--drawer"
+              key={entry.session_id}
+              onToggle={(event) => toggleEntry(entry.session_id, event.currentTarget.open)}
+              open={expandedSessionIds.has(entry.session_id)}
+            >
               <summary className="history-item__summary">
                 <div>
                   <strong>

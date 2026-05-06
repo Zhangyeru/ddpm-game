@@ -519,6 +519,17 @@ export function useGameSession(options?: { autoStepEnabled?: boolean }) {
     }
   }
 
+  function exitSession() {
+    requestSequenceRef.current += 1;
+    setSession(null);
+    setSelectedGuess(null);
+    setGuessReminder(null);
+    setPendingAction(null);
+    setError(null);
+    lastFailedRequestRef.current = null;
+    void loadProgression(true);
+  }
+
   return {
     controlsDisabled:
       pendingAction !== null ||
@@ -549,6 +560,7 @@ export function useGameSession(options?: { autoStepEnabled?: boolean }) {
     retryLeaderboard: () => {
       void loadLeaderboard();
     },
+    exitSession,
     startRound,
     startSelectedLevel,
     submitGuessChoice,

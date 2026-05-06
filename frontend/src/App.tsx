@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { GameCanvas } from "./components/GameCanvas";
 import { GuessPanel } from "./components/GuessPanel";
 import { HistoryDrawer } from "./components/HistoryDrawer";
@@ -52,8 +52,9 @@ export default function App() {
     retryLastAction,
     retryLeaderboard,
     startSelectedLevel,
+    exitSession,
     clearError
-  } = useGameSession({ autoStepEnabled: page !== "leaderboard" });
+  } = useGameSession({ autoStepEnabled: page !== "leaderboard" && !showTransition });
 
   useEffect(() => {
     function handleHashChange() {
@@ -85,6 +86,16 @@ export default function App() {
     setPage("home");
   }
 
+  function returnHomeFromSession() {
+    setShowTransition(false);
+    exitSession();
+    openHome();
+  }
+
+  const closeTransition = useCallback(() => {
+    setShowTransition(false);
+  }, []);
+
   return (
     <div className="app-shell">
       <StatusBar
@@ -104,7 +115,7 @@ export default function App() {
         onLogout={() => {
           void logout();
         }}
-        onOpenHome={() => openHome()}
+        onOpenHome={returnHomeFromSession}
         onStart={() => {
           void startRound();
         }}
@@ -112,10 +123,10 @@ export default function App() {
         session={session}
       />
 
-      {showTransition && session && progression?.current_level ? (
+      {showTransition && session ? (
         <LevelTransitionCard
-          level={progression.current_level}
-          onTransitionComplete={() => setShowTransition(false)}
+          session={session}
+          onTransitionComplete={closeTransition}
         />
       ) : null}
 

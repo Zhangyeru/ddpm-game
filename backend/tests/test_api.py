@@ -73,16 +73,30 @@ def test_progression_and_advance_endpoints_work() -> None:
         assert refreshed_progression.json()["campaign_total_score"] > 0
 
 
-def test_start_specific_level_endpoint_works() -> None:
+def test_start_specific_level_endpoint_works_for_unlocked_level() -> None:
     with TemporaryDirectory() as temp_dir:
-        client, _ = make_test_client(temp_dir)
+        client, service = make_test_client(temp_dir)
         headers = {"X-Player-Id": "api-start-level-player"}
+        actor_id = actor_id_for_anonymous("api-start-level-player")
+        progress = service._campaign_progress(actor_id)
+        progress.highest_unlocked_level_id = "chapter-3-level-2"
 
         response = client.post("/api/session/start-level/chapter-3-level-2", headers=headers)
 
         assert response.status_code == 200
         assert response.json()["level_id"] == "chapter-3-level-2"
         assert response.json()["level_title"] == "连推风险"
+
+
+def test_start_specific_level_rejects_locked_level() -> None:
+    with TemporaryDirectory() as temp_dir:
+        client, _ = make_test_client(temp_dir)
+        headers = {"X-Player-Id": "api-start-locked-level-player"}
+
+        response = client.post("/api/session/start-level/chapter-3-level-2", headers=headers)
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "该关卡尚未解锁，请先完成前置关卡。"
 
 
 def test_commit_family_and_freeze_endpoints_work() -> None:

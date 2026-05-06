@@ -188,15 +188,13 @@ class GameService:
             self._prune_expired_sessions()
             progress = self._campaign_progress(player_key)
             level_definition = level_by_id(level_id)
-
-            progress.current_level_id = level_definition.level_id
-            # 跟踪最高解锁关卡用于UI显示，但不限制API访问
-            # 解锁限制由前端基于 is_unlocked 标志实施
             if (
                 self.level_indices[level_definition.level_id]
                 > self.level_indices[progress.highest_unlocked_level_id]
             ):
-                progress.highest_unlocked_level_id = level_definition.level_id
+                raise ValueError("该关卡尚未解锁，请先完成前置关卡。")
+
+            progress.current_level_id = level_definition.level_id
             progress.campaign_complete = False
             self._save_campaign_progress(player_key, progress)
             session = self._build_session(player_key, progress, level_definition)
